@@ -7,6 +7,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SnowflakeModule } from './snowflake/snowflake.module';
 import { AuthModule } from './auth/auth.module';
 import { NasaModule } from './nasa/nasa.module';
+import { UsersModule } from './users/users.module';
+import { SubscribersModule } from './subscribers/subscribers.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -16,16 +19,19 @@ import { NasaModule } from './nasa/nasa.module';
     CustomersModule,
     SnowflakeModule,
     AuthModule,
+    UsersModule,
     NasaModule,
+    SubscribersModule,
+    NotificationsModule,
     TypeOrmModule.forRoot({
-      type: 'postgres', // type of our database
-      host: 'localhost', // database host
-      port: 5432, // database host
-      username: 'postgres', // username
-      password: 'pass123', // user password
-      database: 'postgres', // name of our database,
-      autoLoadEntities: true, // models will be loaded automatically
-      synchronize: true, // your entities will be synced with the database(recommended: disable in prod)
+      type: 'postgres',
+      host: process.env.POSTGRES_HOST ?? 'localhost',
+      port: parseInt(process.env.POSTGRES_PORT ?? '5432', 10),
+      username: process.env.POSTGRES_USER ?? 'postgres',
+      password: process.env.POSTGRES_PASSWORD ?? 'pass123',
+      database: process.env.POSTGRES_DB ?? 'nasa_sky_tracker',
+      autoLoadEntities: true,
+      synchronize: true,
     }),
   ],
   controllers: [AppController],

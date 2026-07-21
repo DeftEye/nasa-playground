@@ -15,7 +15,7 @@
     "dev": "concurrently --kill-others-on-fail \"npm run start:dev\" \"cd web && npm run dev\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
+    "test": "node scripts/jest.js",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -87,6 +87,12 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/../test/setup/env.ts"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/../test/setup/after-env.ts"
+    ]
   }
 }
