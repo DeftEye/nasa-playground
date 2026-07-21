@@ -1,9 +1,10 @@
 import { Server } from 'node:http';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
+import { configureApp } from '../../src/app.setup';
 
 export interface TestAppContext {
   app: INestApplication;
@@ -23,12 +24,7 @@ export async function createTestApp(): Promise<TestAppContext> {
   }).compile();
 
   const app = moduleRef.createNestApplication();
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-    }),
-  );
+  configureApp(app);
   await app.init();
 
   const dataSource = app.get(DataSource);
