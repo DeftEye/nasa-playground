@@ -1,0 +1,20 @@
+meta {
+  name: write snowflake
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{url}}/snowflake/write
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "tableName": "customers",
+    "data": [
+    ""
+    ]
+  }
+}

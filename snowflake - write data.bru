@@ -1,0 +1,32 @@
+meta {
+  name: Snowflake - Write Data
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/snowflake/write
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "tableName": "CUSTOMER_DATA",
+    "mode": "insert",
+    "data": [
+      {
+        "id": 1,
+        "name": "John Doe",
+        "email": "john.doe@example.com",
+        "created_at": "2025-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "name": "Jane Smith",
+        "email": "jane.smith@example.com",
+        "created_at": "2025-01-02T00:00:00Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+meta {
+  name: get all customers
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{url}}/customers
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "j",
+    "email": "alexis.ego@retool.com",
+    "age": 2,
+    "ji": 12
+  }
+}

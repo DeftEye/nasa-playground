@@ -1,0 +1,17 @@
+meta {
+  name: update customer
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{url}}/customers/1
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "exchanges":["hi"]
+  }
+}

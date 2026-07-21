@@ -1,0 +1,21 @@
+meta {
+  name: get customers by id
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{url}}/customers/1
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "j",
+    "email": "alexis.ego@retool.com",
+    "age": 2,
+    "ji": 12,
+    "exchanges": ["test"]
+  }
+}

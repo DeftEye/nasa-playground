@@ -1,0 +1,23 @@
+meta {
+  name: Snowflake - Create Table
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/snowflake/create-table
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "tableName": "CUSTOMER_DATA",
+    "columns": {
+      "id": "NUMBER",
+      "name": "VARCHAR(255)",
+      "email": "VARCHAR(255)",
+      "created_at": "TIMESTAMP"
+    }
+  }
+}

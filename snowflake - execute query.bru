@@ -1,0 +1,18 @@
+meta {
+  name: Snowflake - Execute Query
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/snowflake/execute-query
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "query": "SELECT * FROM CUSTOMER_DATA WHERE name LIKE ?",
+    "binds": ["%John%"]
+  }
+}
