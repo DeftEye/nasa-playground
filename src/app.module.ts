@@ -8,7 +8,6 @@ import { join } from 'node:path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CustomersModule } from './customers/customers.module';
-import { SnowflakeModule } from './snowflake/snowflake.module';
 import { AuthModule } from './auth/auth.module';
 import { NasaModule } from './nasa/nasa.module';
 import { UsersModule } from './users/users.module';
@@ -48,7 +47,6 @@ function maybeServeStatic(): DynamicModule[] {
     }),
     ...maybeServeStatic(),
     CustomersModule,
-    SnowflakeModule,
     AuthModule,
     UsersModule,
     NasaModule,
