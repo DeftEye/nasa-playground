@@ -14,6 +14,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
+import { Public } from './public.decorator';
 import type { AuthenticatedUser } from './jwt.strategy';
 
 @Controller('auth')
@@ -24,12 +25,14 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @Public()
   @HttpCode(201)
   register(@Body() dto: RegisterDto): Promise<PublicUser> {
     return this.authService.register(dto);
   }
 
   @Post('login')
+  @Public()
   @HttpCode(200)
   login(@Body() dto: LoginDto): Promise<LoginResult> {
     return this.authService.login(dto);

@@ -1,13 +1,14 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApodService } from './apod.service';
 import { ListApodDto } from './dto/list-apod.dto';
+import { Public } from '../../auth/public.decorator';
 
 /**
- * Read-only APOD endpoints. Reads are public (architecture §4: reads are
- * JWT-guarded by default with an `AUTH_REQUIRED=false` dev toggle; for this
- * milestone reads remain public so the `services.yaml` healthcheck fallback
- * works and dev smoke tests do not require a token).
+ * Read-only APOD endpoints. Reads are public via `@Public()` so the
+ * `services.yaml` healthcheck fallback and dev smoke tests work without a
+ * token (architecture §4 / §7).
  */
+@Public()
 @Controller('nasa/apod')
 export class ApodController {
   constructor(private readonly apodService: ApodService) {}

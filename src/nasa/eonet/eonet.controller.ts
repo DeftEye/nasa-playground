@@ -1,12 +1,14 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { EonetService } from './eonet.service';
 import { ListEonetEventsDto } from './dto/list-eonet-events.dto';
+import { Public } from '../../auth/public.decorator';
 
 /**
- * Read-only EONET endpoints. Reads are public this milestone (mirrors the APOD
- * read policy) so the `services.yaml` healthcheck and dev smoke tests do not
- * require a token.
+ * Read-only EONET endpoints. Reads are public via `@Public()` so the
+ * `services.yaml` healthcheck and dev smoke tests work without a token
+ * (architecture §4 / §7).
  */
+@Public()
 @Controller('nasa/eonet')
 export class EonetController {
   constructor(private readonly eonetService: EonetService) {}

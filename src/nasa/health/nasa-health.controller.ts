@@ -1,5 +1,6 @@
 import { Controller, Get, HttpCode, Res } from '@nestjs/common';
 import { NasaHealthService } from './nasa-health.service';
+import { Public } from '../../auth/public.decorator';
 
 /**
  * `GET /api/nasa/health` — reports DB and NASA reachability
@@ -9,9 +10,10 @@ import { NasaHealthService } from './nasa-health.service';
  *   NASA reachability is informational and never downgrades a 200 to a 503.
  * - DB unreachable → `503` `{status:'down', db:'down', nasaReachable:false}`.
  *
- * Reads remain public (mirrors the APOD/EONET read policy this milestone) so
- * the `services.yaml` healthcheck works without a token.
+ * Public via `@Public()` so the `services.yaml` healthcheck works without a
+ * token.
  */
+@Public()
 @Controller('nasa/health')
 export class NasaHealthController {
   constructor(private readonly healthService: NasaHealthService) {}

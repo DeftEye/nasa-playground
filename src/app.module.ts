@@ -1,15 +1,17 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CustomersModule } from './customers/customers.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { SnowflakeModule } from './snowflake/snowflake.module';
 import { AuthModule } from './auth/auth.module';
 import { NasaModule } from './nasa/nasa.module';
 import { UsersModule } from './users/users.module';
 import { SubscribersModule } from './subscribers/subscribers.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { GlobalJwtAuthGuard } from './auth/global-jwt-auth.guard';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
   imports: [
@@ -35,6 +37,12 @@ import { NotificationsModule } from './notifications/notifications.module';
     }),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: GlobalJwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

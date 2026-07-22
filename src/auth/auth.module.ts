@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { GlobalJwtAuthGuard } from './global-jwt-auth.guard';
 import { resolveJwtSecret } from './jwt-secret';
 
 @Module({
@@ -24,7 +25,7 @@ import { resolveJwtSecret } from './jwt-secret';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
-  exports: [JwtAuthGuard, JwtModule, PassportModule],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, GlobalJwtAuthGuard],
+  exports: [JwtAuthGuard, JwtModule, PassportModule, GlobalJwtAuthGuard],
 })
 export class AuthModule {}

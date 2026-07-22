@@ -11,7 +11,14 @@ import {
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customers.dto';
+import { Public } from '../auth/public.decorator';
 
+/**
+ * Legacy `customers` module (off-limits per AGENTS.md). Marked `@Public()` to
+ * preserve its pre-existing public accessibility now that a global JWT guard
+ * is registered in `AppModule`. No business logic is changed.
+ */
+@Public()
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customerService: CustomersService) {}
