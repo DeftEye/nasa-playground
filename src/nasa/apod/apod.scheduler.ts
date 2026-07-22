@@ -32,11 +32,22 @@ export class ApodScheduler implements OnModuleInit {
   private readonly logger = new Logger(ApodScheduler.name);
   /** Visible for tests: chronological log of retry attempts within the latest run. */
   readonly attemptLog: AttemptLogEntry[] = [];
+  /**
+   * In-process skip-if-running flag (architecture §12). A tick fired while the
+   * previous one is still in flight is skipped and logged, preventing
+   * overlapping NASA fetches and duplicate writes.
+   */
+  private running = false;
 
   constructor(
     private readonly apodService: ApodService,
     @Inject(APOD_BACKOFF_MS) private readonly backoff: number[],
   ) {}
+
+  /** True when a tick is currently in flight (visible for overlap tests). */
+  isRunning(): boolean {
+    return this.running;
+  }
 
   onModuleInit(): void {
     // The boot catch-up is a best-effort optimization; in tests we disable it
@@ -59,26 +70,50 @@ export class ApodScheduler implements OnModuleInit {
 
   /** On-boot: backfill 30 days when the DB is empty, else fetch today if missing. */
   async bootCatchUp(): Promise<void> {
-    const count = await this.apodService.count();
-    if (count === 0) {
-      this.logger.log('APOD table empty on boot; running 30-day backfill.');
-      await this.runWithRetry(() => this.apodService.backfill(30));
+    if (this.running) {
+      this.logger.warn(
+        'APOD boot catch-up: previous tick still running, skipping.',
+      );
       return;
     }
-    const today = todayUtc();
-    const existing = await this.apodService.findByDate(today);
-    if (!existing) {
-      this.logger.log(`APOD row for ${today} missing on boot; fetching.`);
-      await this.runWithRetry(() => this.apodService.fetchAndStore(today));
-      return;
+    this.running = true;
+    try {
+      const count = await this.apodService.count();
+      if (count === 0) {
+        this.logger.log('APOD table empty on boot; running 30-day backfill.');
+        await this.runWithRetry(() => this.apodService.backfill(30));
+        return;
+      }
+      const today = todayUtc();
+      const existing = await this.apodService.findByDate(today);
+      if (!existing) {
+        this.logger.log(`APOD row for ${today} missing on boot; fetching.`);
+        await this.runWithRetry(() => this.apodService.fetchAndStore(today));
+        return;
+      }
+      this.logger.log(
+        `APOD row for ${today} already present on boot; no fetch.`,
+      );
+    } finally {
+      this.running = false;
     }
-    this.logger.log(`APOD row for ${today} already present on boot; no fetch.`);
   }
 
   @Cron(process.env.APOD_CRON ?? '0 16 * * *')
   async handleCron(): Promise<void> {
-    this.logger.log('APOD cron tick: fetching today.');
-    await this.runWithRetry(() => this.apodService.fetchAndStore(todayUtc()));
+    if (this.running) {
+      this.logger.warn(
+        'APOD cron tick: previous tick still running, skipping.',
+      );
+      return;
+    }
+    this.running = true;
+    try {
+      this.logger.log('APOD cron tick: fetching today.');
+      await this.runWithRetry(() => this.apodService.fetchAndStore(todayUtc()));
+    } finally {
+      this.running = false;
+    }
   }
 
   /**

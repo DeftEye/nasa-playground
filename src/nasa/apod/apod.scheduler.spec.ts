@@ -334,6 +334,53 @@ describe('ApodScheduler', () => {
     expect(DEFAULT_APOD_BACKOFF_MS).toEqual([1_000, 3_000, 9_000]);
   });
 
+  // VAL-SCHED-010-equivalent (APOD skip-if-running)
+  it('skips a cron tick fired while the previous one is still running', async () => {
+    const repo = fakeRepo();
+    const { scheduler, moduleRef } = await buildScheduler(repo);
+    moduleRefs.push(moduleRef);
+
+    const today = todayUtc();
+    // Delay the NASA response so the first cron tick is still in flight.
+    nock(NASA_BASE)
+      .get(APOD_PATH)
+      .query((q) => q.date === today)
+      .delay(200)
+      .reply(200, apodMock({ date: today }), {
+        'content-type': 'application/json',
+      });
+
+    const logger = (
+      scheduler as unknown as {
+        logger: { warn: (msg: string) => void };
+      }
+    ).logger;
+    const warnSpy = jest
+      .spyOn(logger, 'warn')
+      .mockImplementation(() => undefined);
+
+    try {
+      const firstTick = scheduler.handleCron();
+      // Let the first tick set running=true.
+      await new Promise((r) => setTimeout(r, 30));
+      expect(scheduler.isRunning()).toBe(true);
+
+      // Second tick while the first is in flight -> skipped, no extra NASA call.
+      await scheduler.handleCron();
+      const skipCalled = warnSpy.mock.calls.some((call) =>
+        String(call[0]).includes('previous tick still running, skipping'),
+      );
+      expect(skipCalled).toBe(true);
+
+      await firstTick;
+      expect(scheduler.isRunning()).toBe(false);
+      // Only one row persisted (no duplicate from the skipped tick).
+      expect(repo.store.size).toBe(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   // NasaClientService unit: timeout error type
   it('NasaClientService rejects with NasaApiUnavailableError on timeout', async () => {
     process.env.APOD_TIMEOUT_MS = '120';
