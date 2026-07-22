@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   useMutation,
   useQuery,
@@ -86,9 +86,17 @@ export function Subscribers() {
   const categories: EonetCategory[] = categoriesQuery.data ?? [];
 
   // ----- Mutations (invalidate the list on success) -----
+  // `createSuccessCount` increments on each successful create so the
+  // AddSubscriberForm can reset its fields only on success (M5 polish:
+  // keep user input on failed create, only reset on success).
+  const [createSuccessCount, setCreateSuccessCount] = useState(0);
+
   const createMutation = useMutation({
     mutationFn: createSubscriber,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: SUBSCRIBERS_KEY }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SUBSCRIBERS_KEY });
+      setCreateSuccessCount((c) => c + 1);
+    },
   });
 
   const updateMutation = useMutation({
@@ -199,6 +207,7 @@ export function Subscribers() {
         creating={createMutation.isPending}
         onSubmit={(payload) => createMutation.mutate(payload)}
         submitError={createMutation.error ? 'Could not create subscriber.' : null}
+        resetSignal={createSuccessCount}
       />
 
       {/* Subscribers list. */}
@@ -266,6 +275,9 @@ interface AddSubscriberFormProps {
     apodEnabled: boolean;
     eonetCategorySlugs: string[];
   }) => void;
+  /** Increments on successful create; the form watches this to reset fields
+   * only on success (M5 polish: keeps user input on failed create). */
+  resetSignal: number;
 }
 
 function AddSubscriberForm({
@@ -273,12 +285,26 @@ function AddSubscriberForm({
   creating,
   submitError,
   onSubmit,
+  resetSignal,
 }: AddSubscriberFormProps) {
   const [name, setName] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [apodEnabled, setApodEnabled] = useState(true);
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  // Reset form fields only when the parent signals a successful create
+  // (M5 polish: keeps user input on failed create, only resets on success).
+  // The `resetSignal` counter increments on each successful create.
+  useEffect(() => {
+    if (resetSignal > 0) {
+      setName('');
+      setWebhookUrl('');
+      setApodEnabled(true);
+      setSelectedSlugs([]);
+      setFieldErrors({});
+    }
+  }, [resetSignal]);
 
   function toggleSlug(slug: string) {
     setSelectedSlugs((prev) =>
@@ -316,13 +342,8 @@ function AddSubscriberForm({
       apodEnabled,
       eonetCategorySlugs: selectedSlugs,
     });
-    // Reset on submit dispatch (success invalidates the list; failure shows
-    // the submitError). Keeping fields on failure lets the user fix + retry.
-    setName('');
-    setWebhookUrl('');
-    setApodEnabled(true);
-    setSelectedSlugs([]);
-    setFieldErrors({});
+    // Form reset is handled by the `resetSignal` effect which fires only
+    // on successful create (M5 polish: keeps user input on failed create).
   }
 
   return (

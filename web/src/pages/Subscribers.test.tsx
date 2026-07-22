@@ -601,3 +601,67 @@ describe('Subscribers — 5xx error and retry', () => {
     expect(callCount).toBeGreaterThanOrEqual(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// M5 polish: AddSubscriberForm keeps user input on failed create
+// ---------------------------------------------------------------------------
+
+describe('Subscribers — M5 polish: keeps input on failed create', () => {
+  it('form retains name and URL when create returns 500', async () => {
+    const user = userEvent.setup();
+    server.use(
+      categoriesHandler(),
+      listHandler(),
+      http.post('/api/subscribers', () =>
+        HttpResponse.json({ message: 'server error' }, { status: 500 }),
+      ),
+    );
+
+    renderWithProviders(<SubscribersTree />, {
+      routerProps: { initialEntries: ['/subscribers'] },
+    });
+
+    // Wait for the form to appear.
+    await screen.findByTestId('add-subscriber-form');
+
+    const nameInput = screen.getByTestId('sub-name-input');
+    const urlInput = screen.getByTestId('sub-webhook-input');
+    await user.type(nameInput, 'My Channel');
+    await user.type(urlInput, validWebhookUrl);
+
+    await user.click(screen.getByTestId('add-subscriber-submit'));
+
+    // Wait for the submit to complete and error to show.
+    await waitFor(() => {
+      expect(screen.getByTestId('add-subscriber-submit-error')).toBeInTheDocument();
+    });
+
+    // Form should still have the user's input.
+    expect(nameInput).toHaveValue('My Channel');
+    expect(urlInput).toHaveValue(validWebhookUrl);
+  });
+
+  it('form resets on successful create', async () => {
+    const user = userEvent.setup();
+    server.use(categoriesHandler(), listHandler(), createHandler());
+
+    renderWithProviders(<SubscribersTree />, {
+      routerProps: { initialEntries: ['/subscribers'] },
+    });
+
+    await screen.findByTestId('add-subscriber-form');
+
+    const nameInput = screen.getByTestId('sub-name-input');
+    const urlInput = screen.getByTestId('sub-webhook-input');
+    await user.type(nameInput, 'New Sub');
+    await user.type(urlInput, validWebhookUrl);
+
+    await user.click(screen.getByTestId('add-subscriber-submit'));
+
+    // Form should be cleared after success.
+    await waitFor(() => {
+      expect(nameInput).toHaveValue('');
+      expect(urlInput).toHaveValue('');
+    });
+  });
+});

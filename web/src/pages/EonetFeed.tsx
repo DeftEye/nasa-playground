@@ -164,7 +164,10 @@ export function EonetFeed() {
         </div>
       )}
 
-      {/* Category chips (VAL-FE-EONET-001/002). Single-select; "All" clears. */}
+      {/* Category chips (VAL-FE-EONET-001/002). Single-select; "All" clears.
+          M5 polish: surfaces an inline ErrorState+Retry when
+          /api/nasa/eonet/categories 5xx errors so users see 'failed to load
+          categories', not just 'All'. */}
       <div
         className="mb-3 flex flex-wrap gap-2"
         data-testid="eonet-category-chips"
@@ -190,6 +193,24 @@ export function EonetFeed() {
           >
             Loading categories…
           </span>
+        )}
+        {categoriesQuery.isError && (
+          <div
+            className="flex items-center gap-2"
+            data-testid="eonet-categories-error"
+          >
+            <span className="text-xs text-red-600 dark:text-red-400">
+              Failed to load categories
+            </span>
+            <button
+              type="button"
+              onClick={() => categoriesQuery.refetch()}
+              className="rounded border border-red-300 px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
+              data-testid="eonet-categories-retry"
+            >
+              Retry
+            </button>
+          </div>
         )}
       </div>
 

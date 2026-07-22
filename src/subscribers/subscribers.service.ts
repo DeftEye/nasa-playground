@@ -252,7 +252,15 @@ export class SubscribersService {
       'test',
       subscriber.id,
     );
+    // Guard: fanOut always returns exactly one row per subscriber when the
+    // input array is non-empty, but defensively handle an empty result so
+    // we never return `undefined.id` (M5 hardening).
     const row = rows[0];
+    if (!row) {
+      throw new Error(
+        `Test notification fan-out returned no rows for subscriber ${subscriber.id}`,
+      );
+    }
     return { id: row.id, status: row.status };
   }
 

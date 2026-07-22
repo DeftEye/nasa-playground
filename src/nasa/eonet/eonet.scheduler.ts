@@ -5,11 +5,15 @@ import { EonetService } from './eonet.service';
 /**
  * Exponential backoff schedule between EONET retry attempts (architecture §12).
  * Default cadence mirrors APOD: 1 s / 3 s / 9 s. Overridable via DI for tests.
+ *
+ * Same dead-code reconciliation as APOD: with `EONET_MAX_ATTEMPTS = 3` (3 total
+ * attempts = 1 initial + 2 retries), `backoff[2]` (9s) is a reserved slot for
+ * a potential future 4th attempt. See `apod.scheduler.ts` for the full note.
  */
 export const EONET_BACKOFF_MS = 'EONET_BACKOFF_MS';
 export const DEFAULT_EONET_BACKOFF_MS = [1_000, 3_000, 9_000];
 
-/** Maximum number of attempts per EONET scheduler tick. */
+/** Maximum number of attempts per EONET scheduler tick (1 initial + 2 retries). */
 export const EONET_MAX_ATTEMPTS = 3;
 
 export interface EonetAttemptLogEntry {

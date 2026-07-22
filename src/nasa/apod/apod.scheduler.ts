@@ -5,11 +5,21 @@ import { ApodService, todayUtc } from './apod.service';
 /**
  * Exponential backoff schedule between retry attempts (architecture §12).
  * Default cadence is 1 s / 3 s / 9 s. Overridable via DI for fast tests.
+ *
+ * Note on dead-code reconciliation (M5): with `APOD_MAX_ATTEMPTS = 3` (3 total
+ * attempts = 1 initial + 2 retries), only `backoff[0]` (1s) and `backoff[1]`
+ * (3s) are consumed. `backoff[2]` (9s) is a reserved slot for a potential
+ * future 4th attempt — `delayFor` already handles it gracefully via a
+ * fallback to the last element. The architecture's "3 retries at 1s/3s/9s"
+ * phrasing describes the full backoff schedule; the v1 implementation performs
+ * 3 total attempts (2 retries) and the 9s slot remains available if
+ * `APOD_MAX_ATTEMPTS` is later raised to 4. This keeps the backoff array
+ * self-documenting and avoids a silent dead-code value.
  */
 export const APOD_BACKOFF_MS = 'APOD_BACKOFF_MS';
 export const DEFAULT_APOD_BACKOFF_MS = [1_000, 3_000, 9_000];
 
-/** Maximum number of attempts per scheduler tick / boot catch-up. */
+/** Maximum number of attempts per scheduler tick / boot catch-up (1 initial + 2 retries). */
 export const APOD_MAX_ATTEMPTS = 3;
 
 export interface AttemptLogEntry {

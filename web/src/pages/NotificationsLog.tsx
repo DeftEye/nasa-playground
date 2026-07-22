@@ -70,7 +70,9 @@ export function NotificationsLog() {
   const notificationsQuery = useQuery({
     queryKey: ['notifications', sourceParam, statusParam],
     queryFn: () =>
-      fetchNotifications({ source: sourceParam, status: statusParam }),
+      // Fetch with limit=100 (BE max) so users see all recent rows without
+      // needing pagination (M5 polish — architecture §4: max limit 100).
+      fetchNotifications({ source: sourceParam, status: statusParam, limit: 100 }),
   });
 
   // Close the modal on Escape (accessibility).

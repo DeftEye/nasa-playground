@@ -465,3 +465,72 @@ describe('EonetFeed — clearing an active filter badge', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// M5 polish: category-chip row surfaces inline ErrorState+Retry when
+// /api/nasa/eonet/categories 5xx errors
+// ---------------------------------------------------------------------------
+
+describe('EonetFeed — M5 polish: category error state', () => {
+  it('shows inline error + retry when categories 5xx, events still render', async () => {
+    server.use(
+      http.get('/api/nasa/eonet/categories', () =>
+        HttpResponse.json({ message: 'boom' }, { status: 500 }),
+      ),
+      eventsHandler(),
+    );
+
+    renderWithProviders(<EonetTree />, {
+      routerProps: { initialEntries: ['/eonet'] },
+    });
+
+    // Wait for events to render (categories failure doesn't block events).
+    await screen.findAllByTestId('eonet-event-card');
+
+    // Category error indicator should be visible.
+    await waitFor(() => {
+      expect(screen.getByTestId('eonet-categories-error')).toBeInTheDocument();
+    });
+
+    // Retry button present.
+    expect(screen.getByTestId('eonet-categories-retry')).toBeInTheDocument();
+  });
+
+  it('retry re-fetches categories and clears error on success', async () => {
+    let categoriesFail = true;
+    server.use(
+      http.get('/api/nasa/eonet/categories', () => {
+        if (categoriesFail) {
+          return HttpResponse.json({ message: 'boom' }, { status: 500 });
+        }
+        return HttpResponse.json(CATEGORIES, { status: 200 });
+      }),
+      eventsHandler(),
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders(<EonetTree />, {
+      routerProps: { initialEntries: ['/eonet'] },
+    });
+
+    // Wait for error to appear.
+    await screen.findAllByTestId('eonet-event-card');
+    await waitFor(() => {
+      expect(screen.getByTestId('eonet-categories-error')).toBeInTheDocument();
+    });
+
+    // Fix the handler and click retry.
+    categoriesFail = false;
+    await user.click(screen.getByTestId('eonet-categories-retry'));
+
+    // Error should disappear and category chips should appear.
+    await waitFor(() => {
+      expect(screen.queryByTestId('eonet-categories-error')).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const chips = screen.getAllByTestId('eonet-category-chip');
+      // "All" + 3 categories = 4 chips
+      expect(chips.length).toBe(1 + CATEGORIES.length);
+    });
+  });
+});

@@ -193,3 +193,38 @@ describe('Register success (VAL-FE-AUTH-007)', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe(TOKEN);
   });
 });
+
+// ---------------------------------------------------------------------------
+// M5 polish: distinct error when register 201 but login 401
+// ---------------------------------------------------------------------------
+
+describe('Register — M5 polish: register succeeds but login fails', () => {
+  it('shows a distinct error when register 201 but login 401', async () => {
+    const user = userEvent.setup();
+    const { server } = await import('../test/server');
+    server.use(
+      http.post('/api/auth/register', () =>
+        HttpResponse.json(USER, { status: 201 }),
+      ),
+      http.post('/api/auth/login', () =>
+        HttpResponse.json({ message: 'Unauthorized' }, { status: 401 }),
+      ),
+    );
+
+    renderWithProviders(<RegisterTree />, {
+      routerProps: { initialEntries: ['/register'] },
+    });
+
+    await user.type(screen.getByLabelText(/email/i), EMAIL);
+    await user.type(screen.getByLabelText(/password/i), PASSWORD);
+    await user.click(screen.getByRole('button', { name: /create account/i }));
+
+    const err = await screen.findByTestId('register-submit-error');
+    // Should show the distinct "Account created, but automatic sign-in failed" message.
+    expect(err).toHaveTextContent(/account created.*sign-in failed/i);
+    // No token stored.
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+    // Still on register page.
+    expect(screen.queryByText('Home page')).not.toBeInTheDocument();
+  });
+});

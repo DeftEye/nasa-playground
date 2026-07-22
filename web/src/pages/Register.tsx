@@ -70,6 +70,13 @@ export function Register() {
         (err as { response?: { status?: number } }).response?.status ?? 0;
       if (status === 409) {
         setSubmitError('This email is already registered. Try logging in.');
+      } else if (status === 401) {
+        // M5 polish: register succeeded (201) but the auto-login call
+        // returned 401. Surface a distinct message so the user knows their
+        // account was created and they should try signing in manually.
+        setSubmitError(
+          'Account created, but automatic sign-in failed. Please log in.',
+        );
       } else {
         setSubmitError('Something went wrong. Please try again.');
       }

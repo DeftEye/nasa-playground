@@ -31,8 +31,11 @@ export default tseslint.config(
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn'
+      // M5 polish: restored to canonical strictness (recommendedTypeChecked
+      // sets these to 'error'). They were downgraded to 'warn' during M1
+      // scaffolding; the codebase now satisfies the stricter level.
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
     },
   },
 );
