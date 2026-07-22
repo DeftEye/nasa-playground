@@ -8,13 +8,11 @@ import { Home } from './pages/Home';
 import { ApodArchive } from './pages/ApodArchive';
 import { EonetFeed } from './pages/EonetFeed';
 import { NotificationsLog } from './pages/NotificationsLog';
+import { Subscribers } from './pages/Subscribers';
 
 /**
- * Placeholder page component for routes owned by subsequent M4 features
- * (Subscribers). It renders inside the authenticated `AppLayout` shell so the
- * top-right user menu (Logout) is visible and protected-route gating works
- * end-to-end today. It will be replaced by its real implementation in its
- * own feature.
+ * Placeholder page component for routes not yet implemented. Currently used
+ * only for the catch-all 404 route.
  */
 function Placeholder({ label }: { label: string }) {
   return (
@@ -68,7 +66,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/subscribers',
-            element: <Placeholder label="Subscribers (coming soon)" />,
+            element: <Subscribers />,
           },
         ],
       },

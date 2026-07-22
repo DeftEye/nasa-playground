@@ -114,6 +114,8 @@ export interface PublicSubscriber {
   apodEnabled: boolean;
   enabled: boolean;
   eonetCategorySlugs: string[];
+  /** Masked webhook URL (`/webhooks/.../<last-4>`); raw URL never sent. */
+  maskedWebhookUrl: string;
   createdAt: string;
 }
 
@@ -135,6 +137,8 @@ export interface UpdateSubscriberPayload {
 
 export interface TestNotificationResult {
   id: string;
+  /** Delivery status of the created log row: `sent` | `mocked` | `failed`. */
+  status: NotificationStatus;
 }
 
 // ---------------------------------------------------------------------------

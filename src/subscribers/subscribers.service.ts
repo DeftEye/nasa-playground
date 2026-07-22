@@ -14,8 +14,11 @@ import { maskWebhookUrl } from './webhook-redact';
 
 /**
  * Public representation of a subscriber as returned by list/get endpoints.
- * The Discord webhook URL is NEVER included (architecture §13 / VAL-SUB-001 /
- * VAL-SUB-004 / VAL-CROSS-011).
+ * The raw Discord webhook URL is NEVER included (architecture §13 /
+ * VAL-SUB-001 / VAL-SUB-004 / VAL-CROSS-011). A `maskedWebhookUrl` field
+ * (`/webhooks/.../<last-4>`) is included so the frontend can display a
+ * masked indicator per row without ever receiving the raw URL
+ * (VAL-FE-SUB-004).
  */
 export interface PublicSubscriber {
   id: string;
@@ -23,6 +26,7 @@ export interface PublicSubscriber {
   apodEnabled: boolean;
   enabled: boolean;
   eonetCategorySlugs: string[];
+  maskedWebhookUrl: string;
   createdAt: Date;
 }
 
@@ -211,12 +215,17 @@ export class SubscribersService {
    * `'mocked'`. In real mode, a POST to the subscriber's webhook URL is made
    * and the row's status is `'sent'` (2xx) or `'failed'` (non-2xx / error).
    *
-   * Returns `{ id }` of the created `notification_log` row.
+   * Returns `{ id, status }` of the created `notification_log` row. The
+   * `status` field lets the frontend surface an inline success/failure
+   * indicator on the `/subscribers` page without an extra round-trip
+   * (VAL-FE-SUB-007 / VAL-FE-SUB-009). The HTTP response is always 2xx even
+   * when delivery failed — the failure is captured in `status='failed'`, not
+   * in the HTTP status.
    */
   async sendTestNotification(
     ownerId: string,
     id: string,
-  ): Promise<{ id: string }> {
+  ): Promise<{ id: string; status: string }> {
     const subscriber = await this.findOneOwned(ownerId, id);
     if (!subscriber) {
       throw new NotFoundException();
@@ -244,7 +253,7 @@ export class SubscribersService {
       subscriber.id,
     );
     const row = rows[0];
-    return { id: row.id };
+    return { id: row.id, status: row.status };
   }
 
   // ---------- Helpers ----------
@@ -291,6 +300,7 @@ export class SubscribersService {
       apodEnabled: subscriber.apodEnabled,
       enabled: subscriber.enabled,
       eonetCategorySlugs: (subscriber.categories ?? []).map((c) => c.id).sort(),
+      maskedWebhookUrl: maskWebhookUrl(subscriber.discordWebhookUrl),
       createdAt: subscriber.createdAt,
     };
   }
