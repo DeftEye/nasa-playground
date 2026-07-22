@@ -1,8 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApodEntry, ApodMediaType } from './entities/apod-entry.entity';
 import { NasaApodResponse, NasaClientService } from '../common';
+import {
+  NotificationService,
+  FanOutPayload,
+} from '../../notifications/notifications.service';
+import { SubscriberMatcherService } from '../../subscribers/subscriber-matcher.service';
 
 /**
  * Returns today's date as `YYYY-MM-DD` in UTC. NASA APOD dates are calendar
@@ -74,10 +79,14 @@ export function dateNDaysAgo(
 
 @Injectable()
 export class ApodService {
+  private readonly logger = new Logger(ApodService.name);
+
   constructor(
     @InjectRepository(ApodEntry)
     private readonly repo: Repository<ApodEntry>,
     private readonly nasaClient: NasaClientService,
+    private readonly notifications: NotificationService,
+    private readonly subscriberMatcher: SubscriberMatcherService,
   ) {}
 
   findByDate(date: string): Promise<ApodEntry | null> {
@@ -113,6 +122,58 @@ export class ApodService {
     const response = await this.nasaClient.getApod(targetDate);
     const entry = this.transform(response, targetDate);
     return this.repo.save(entry);
+  }
+
+  /**
+   * Builds the Discord webhook payload for an APOD entry (architecture §8 /
+   * VAL-CROSS-004). Real-mode body shape: `{content, embeds:[{title, url,
+   * image?:{url}}]}`. The `image` field is only included for `image` media
+   * rows; video rows rely on Discord's YouTube auto-embed via `url` (the raw
+   * YouTube watch link) so no `image` is sent.
+   */
+  buildApodPayload(entry: ApodEntry): FanOutPayload {
+    const embed: Record<string, unknown> = {
+      title: entry.title,
+      url: entry.url,
+    };
+    if (entry.mediaType === 'image') {
+      embed.image = { url: entry.url };
+    }
+    return {
+      content: `New APOD: ${entry.title}`,
+      embeds: [embed],
+    };
+  }
+
+  /**
+   * Fetches + upserts an APOD entry (default: today) then fans the
+   * notification out to every enabled, APOD-enabled subscriber. Returns the
+   * persisted APOD row. Fan-out failures are isolated inside
+   * {@link NotificationService.fanOut} and never abort the caller
+   * (VAL-NOTIF-008). Zero matching subscribers → zero log rows, trigger still
+   * returns 2xx (VAL-NOTIF-012).
+   *
+   * Used by the manual trigger and the cron tick. Read paths (`getToday`,
+   * `backfill`) deliberately use {@link fetchAndStore} directly so a
+   * fetch-on-miss or boot backfill does not emit notifications.
+   */
+  async fetchStoreAndNotify(date?: string): Promise<ApodEntry> {
+    const entry = await this.fetchAndStore(date);
+    try {
+      const subscribers = await this.subscriberMatcher.findApodEnabled();
+      await this.notifications.fanOut(
+        subscribers,
+        this.buildApodPayload(entry),
+        'apod',
+        entry.date,
+      );
+    } catch (err) {
+      // Fan-out selection must never crash the trigger / cron path.
+      this.logger.error(
+        `APOD fan-out failed for ${entry.date}: ${(err as Error).message}`,
+      );
+    }
+    return entry;
   }
 
   /**

@@ -8,6 +8,11 @@ import {
   EonetStatus,
   EonetGeometryPoint,
 } from './entities/eonet-event.entity';
+import {
+  NotificationService,
+  FanOutPayload,
+} from '../../notifications/notifications.service';
+import { SubscriberMatcherService } from '../../subscribers/subscriber-matcher.service';
 
 /**
  * Number of days back to fetch closed events for. Bounded so the closed-fetch
@@ -95,6 +100,51 @@ export interface EonetFetchResult {
 }
 
 /**
+ * A persisted EONET event that should trigger notification fan-out: a
+ * `detected` or `updated` event with a non-empty geometry array. Events with
+ * `geometry: null` or `geometry: []` are persisted but excluded from fan-out
+ * (architecture §12 / VAL-EONET-005 / VAL-NOTIF-005).
+ */
+interface NotifiableEvent {
+  id: string;
+  title: string;
+  link: string;
+  status: EonetStatus;
+  categoryIds: string[];
+}
+
+/**
+ * Builds the Discord webhook payload for an EONET event (architecture §8:
+ * "EONET renders category + status + GeoJSON bbox link"). Real-mode body
+ * shape: `{content, embeds:[{title, url, fields}]}`.
+ */
+export function buildEonetPayload(event: {
+  id: string;
+  title: string;
+  link: string;
+  status: EonetStatus;
+  categoryIds: string[];
+}): FanOutPayload {
+  return {
+    content: `EONET event: ${event.title}`,
+    embeds: [
+      {
+        title: event.title,
+        url: event.link,
+        fields: [
+          { name: 'Status', value: event.status },
+          {
+            name: 'Categories',
+            value: event.categoryIds.join(', ') || 'none',
+          },
+          { name: 'Event ID', value: event.id },
+        ],
+      },
+    ],
+  };
+}
+
+/**
  * EONET ingestion service. Seeds categories, fetches open + bounded-closed
  * events, reconciles M2M links, lazily creates unknown categories, skips
  * malformed-geometry events, preserves large geometries verbatim, and keeps
@@ -116,6 +166,8 @@ export class EonetService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly nasaClient: NasaClientService,
+    private readonly notifications: NotificationService,
+    private readonly subscriberMatcher: SubscriberMatcherService,
   ) {}
 
   /** Returns all seeded categories as `{id, title, description}`. */
@@ -183,10 +235,14 @@ export class EonetService {
       skipped: [],
       unchanged: [],
     };
+    // Notifiable events (detected/updated with non-empty geometry) collected
+    // during the run; fanned out after every event is persisted so a transport
+    // failure never aborts ingestion (VAL-NOTIF-008).
+    const notifiable: NotifiableEvent[] = [];
 
     const all = [...openEvents, ...closedEvents];
     for (const dto of all) {
-      await this.persistEvent(dto, result);
+      await this.persistEvent(dto, result, notifiable);
     }
 
     this.logger.log(
@@ -194,7 +250,38 @@ export class EonetService {
         `${result.updated.length} updated, ${result.unchanged.length} unchanged, ` +
         `${result.skipped.length} skipped.`,
     );
+
+    await this.fanOutNotifiable(notifiable);
+
     return result;
+  }
+
+  /**
+   * Fans out notifications for each notifiable event to its matching
+   * subscriber set. Per-subscriber cardinality is enforced by
+   * {@link SubscriberMatcherService.findMatchingEonet} (each subscriber
+   * appears once per event regardless of how many categories overlap —
+   * VAL-NOTIF-006). Failures are isolated inside {@link NotificationService}
+   * and never abort the loop or the caller (VAL-NOTIF-008).
+   */
+  private async fanOutNotifiable(notifiable: NotifiableEvent[]): Promise<void> {
+    for (const event of notifiable) {
+      try {
+        const subscribers = await this.subscriberMatcher.findMatchingEonet(
+          event.categoryIds,
+        );
+        await this.notifications.fanOut(
+          subscribers,
+          buildEonetPayload(event),
+          'eonet',
+          event.id,
+        );
+      } catch (err) {
+        this.logger.error(
+          `EONET fan-out failed for ${event.id}: ${(err as Error).message}`,
+        );
+      }
+    }
   }
 
   /** Fetches the events list for a single status window, mapping errors to empty. */
@@ -217,11 +304,14 @@ export class EonetService {
   /**
    * Persists (or updates) a single EONET event and reconciles its M2M
    * categories. Skips malformed-geometry events. Lazily creates unknown
-   * category slugs. Mutates `result` to record the outcome.
+   * category slugs. Mutates `result` to record the outcome and pushes
+   * notifiable events (detected/updated with non-empty geometry) onto
+   * `notifiable` so the caller can fan them out.
    */
   private async persistEvent(
     dto: EonetEventDto,
     result: EonetFetchResult,
+    notifiable: NotifiableEvent[],
   ): Promise<void> {
     const geom = normalizeGeometry(dto.geometry);
     if (geom.kind === 'malformed') {
@@ -254,6 +344,7 @@ export class EonetService {
       }
       categories.push(cat);
     }
+    const categoryIds = categories.map((c) => c.id);
 
     const existing = await this.eventRepo.findOne({ where: { id: dto.id } });
     const now = new Date();
@@ -274,6 +365,15 @@ export class EonetService {
       await this.syncCategories(dto.id, categories);
       this.logger.log(`EONET event detected: ${dto.id}.`);
       result.detected.push(dto.id);
+      if (geom.kind === 'array' && geom.value.length > 0) {
+        notifiable.push({
+          id: dto.id,
+          title: dto.title,
+          link: dto.link,
+          status,
+          categoryIds,
+        });
+      }
       return;
     }
 
@@ -297,9 +397,27 @@ export class EonetService {
         `EONET event updated: ${dto.id} (status ${existing.status}->${status}).`,
       );
       result.updated.push(dto.id);
+      if (geom.kind === 'array' && geom.value.length > 0) {
+        notifiable.push({
+          id: dto.id,
+          title: dto.title,
+          link: dto.link,
+          status,
+          categoryIds,
+        });
+      }
     } else if (geometryChanged) {
       this.logger.log(`EONET event updated: ${dto.id} (geometry changed).`);
       result.updated.push(dto.id);
+      if (geom.kind === 'array' && geom.value.length > 0) {
+        notifiable.push({
+          id: dto.id,
+          title: dto.title,
+          link: dto.link,
+          status,
+          categoryIds,
+        });
+      }
     } else {
       result.unchanged.push(dto.id);
     }

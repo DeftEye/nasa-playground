@@ -16,6 +16,8 @@ import {
   NasaApiUnavailableError,
   EonetEventDto,
 } from '../common';
+import { NotificationService } from '../../notifications/notifications.service';
+import { SubscriberMatcherService } from '../../subscribers/subscriber-matcher.service';
 
 const EONET_BASE = 'https://eonet.gsfc.nasa.gov';
 const EONET_API = '/api/v3';
@@ -96,11 +98,23 @@ function buildInMemoryService(): {
   } as unknown as DataSource;
 
   const nasaClient = new NasaClientService();
+  // Fan-out deps are stubbed: the scheduler spec has no subscribers, so
+  // fan-out is a no-op. Stubs prevent the constructor change from breaking
+  // the in-memory harness.
+  const notifications = {
+    fanOut: jest.fn().mockResolvedValue([]),
+  } as unknown as NotificationService;
+  const subscriberMatcher = {
+    findApodEnabled: jest.fn().mockResolvedValue([]),
+    findMatchingEonet: jest.fn().mockResolvedValue([]),
+  } as unknown as SubscriberMatcherService;
   const service = new EonetService(
     eventRepo,
     categoryRepo,
     dataSource,
     nasaClient,
+    notifications,
+    subscriberMatcher,
   );
 
   return { service, events, categories };

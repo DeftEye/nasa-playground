@@ -11,9 +11,16 @@ import {
 } from './apod.scheduler';
 import { NasaClientService } from '../common';
 import { AuthModule } from '../../auth/auth.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
+import { SubscribersModule } from '../../subscribers/subscribers.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ApodEntry]), AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([ApodEntry]),
+    AuthModule,
+    NotificationsModule,
+    SubscribersModule,
+  ],
   controllers: [ApodController, ApodTriggerController],
   providers: [
     NasaClientService,

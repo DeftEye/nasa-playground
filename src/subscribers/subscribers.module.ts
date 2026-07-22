@@ -5,6 +5,7 @@ import { EonetCategory } from '../nasa/eonet/entities/eonet-category.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SubscribersController } from './subscribers.controller';
 import { SubscribersService } from './subscribers.service';
+import { SubscriberMatcherService } from './subscriber-matcher.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -14,7 +15,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [SubscribersController],
-  providers: [SubscribersService],
-  exports: [SubscribersService, TypeOrmModule],
+  providers: [SubscribersService, SubscriberMatcherService],
+  exports: [SubscribersService, SubscriberMatcherService, TypeOrmModule],
 })
 export class SubscribersModule {}

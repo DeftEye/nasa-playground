@@ -12,9 +12,16 @@ import {
 } from './eonet.scheduler';
 import { NasaClientService } from '../common';
 import { AuthModule } from '../../auth/auth.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
+import { SubscribersModule } from '../../subscribers/subscribers.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([EonetCategory, EonetEvent]), AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([EonetCategory, EonetEvent]),
+    AuthModule,
+    NotificationsModule,
+    SubscribersModule,
+  ],
   controllers: [EonetController, EonetTriggerController],
   providers: [
     NasaClientService,

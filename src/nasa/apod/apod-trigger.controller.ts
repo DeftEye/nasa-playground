@@ -30,6 +30,6 @@ export class ApodTriggerController {
       throw new BadRequestException('date must be a valid YYYY-MM-DD date');
     }
     const target = date && date !== '' ? date : undefined;
-    return this.apodService.fetchAndStore(target);
+    return this.apodService.fetchStoreAndNotify(target);
   }
 }

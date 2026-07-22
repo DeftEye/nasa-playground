@@ -110,7 +110,9 @@ export class ApodScheduler implements OnModuleInit {
     this.running = true;
     try {
       this.logger.log('APOD cron tick: fetching today.');
-      await this.runWithRetry(() => this.apodService.fetchAndStore(todayUtc()));
+      await this.runWithRetry(() =>
+        this.apodService.fetchStoreAndNotify(todayUtc()),
+      );
     } finally {
       this.running = false;
     }

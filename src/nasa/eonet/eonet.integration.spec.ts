@@ -423,7 +423,9 @@ describe('EONET (integration)', () => {
     );
     expect(geomRows[0].len).toBe(0);
 
-    // No notification_log rows for this event (fan-out not wired in M2).
+    // No notification_log rows for this event: empty-geometry events are
+    // persisted but skipped by fan-out (VAL-EONET-005 / VAL-NOTIF-005). With
+    // no subscribers in this test, the count is 0 regardless.
     const logRows: Array<{ count: string }> = await dataSource.query(
       "SELECT COUNT(*)::text AS count FROM notification_log WHERE reference_id = 'EONET_300'",
     );

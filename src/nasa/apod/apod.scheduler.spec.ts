@@ -15,6 +15,8 @@ import {
   NasaApodResponse,
   NasaApiUnavailableError,
 } from '../common';
+import { NotificationService } from '../../notifications/notifications.service';
+import { SubscriberMatcherService } from '../../subscribers/subscriber-matcher.service';
 
 const NASA_BASE = 'https://api.nasa.gov';
 const APOD_PATH = '/planetary/apod';
@@ -95,6 +97,21 @@ async function buildScheduler(repo: ReturnType<typeof fakeRepo>): Promise<{
       ApodScheduler,
       { provide: getRepositoryToken(ApodEntry), useValue: repo },
       { provide: APOD_BACKOFF_MS, useValue: FAST_BACKOFF },
+      // Fan-out deps stubbed: the scheduler spec has no subscribers, so
+      // fan-out is a no-op. Stubs keep the harness DB-free.
+      {
+        provide: NotificationService,
+        useValue: {
+          fanOut: jest.fn().mockResolvedValue([]),
+        } as unknown as NotificationService,
+      },
+      {
+        provide: SubscriberMatcherService,
+        useValue: {
+          findApodEnabled: jest.fn().mockResolvedValue([]),
+          findMatchingEonet: jest.fn().mockResolvedValue([]),
+        } as unknown as SubscriberMatcherService,
+      },
     ],
   }).compile();
 
