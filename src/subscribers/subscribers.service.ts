@@ -7,9 +7,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Subscriber } from './entities/subscriber.entity';
 import { EonetCategory } from '../nasa/eonet/entities/eonet-category.entity';
-import { NotificationLog } from '../notifications/entities/notification-log.entity';
+import { NotificationService } from '../notifications/notifications.service';
 import { CreateSubscriberDto } from './dto/create-subscriber.dto';
 import { UpdateSubscriberDto } from './dto/update-subscriber.dto';
+import { maskWebhookUrl } from './webhook-redact';
 
 /**
  * Public representation of a subscriber as returned by list/get endpoints.
@@ -25,22 +26,11 @@ export interface PublicSubscriber {
   createdAt: Date;
 }
 
-/**
- * Masked webhook URL form: `/webhooks/.../<last-4>` (architecture §13).
- * Extracts the last path segment's trailing 4 chars and prefixes the
- * canonical redaction shape. Used in `notification_log.payload` so the raw
- * webhook URL never appears in logs.
- */
-export function maskWebhookUrl(url: string): string {
-  try {
-    const trimmed = url.replace(/\/+$/, '');
-    const lastSegment = trimmed.split('/').pop() ?? '';
-    const last4 = lastSegment.slice(-4);
-    return `/webhooks/.../${last4}`;
-  } catch {
-    return '/webhooks/.../****';
-  }
-}
+// Webhook URL redaction lives in `./webhook-redact` so the notifications
+// module can reuse it without a circular service import. Re-exported here for
+// backward compatibility with any existing importers.
+export { maskWebhookUrl } from './webhook-redact';
+// (The `maskWebhookUrl` used internally below is imported above as a value.)
 
 @Injectable()
 export class SubscribersService {
@@ -49,8 +39,7 @@ export class SubscribersService {
     private readonly subscribers: Repository<Subscriber>,
     @InjectRepository(EonetCategory)
     private readonly categories: Repository<EonetCategory>,
-    @InjectRepository(NotificationLog)
-    private readonly notificationLog: Repository<NotificationLog>,
+    private readonly notifications: NotificationService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -236,8 +225,6 @@ export class SubscribersService {
     const maskedUrl = maskWebhookUrl(subscriber.discordWebhookUrl);
     const payload = {
       content: `Test notification for subscriber "${subscriber.name}"`,
-      subscriberId: subscriber.id,
-      webhookUrl: maskedUrl,
       embeds: [
         {
           title: 'Test notification',
@@ -246,45 +233,18 @@ export class SubscribersService {
       ],
     };
 
-    let status: 'sent' | 'mocked' | 'failed' = 'mocked';
-    let error: string | null = null;
-
-    if (process.env.DISABLE_NOTIFICATION_MOCK === 'true') {
-      // Real-mode POST to the subscriber's webhook URL. No retry (one POST per
-      // fan-out). Errors are captured, not thrown — the log row is written
-      // regardless (VAL-NOTIF-003 / VAL-NOTIF-008).
-      try {
-        const res = await fetch(subscriber.discordWebhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: payload.content,
-            embeds: payload.embeds,
-          }),
-        });
-        if (res.status >= 200 && res.status < 300) {
-          status = 'sent';
-        } else {
-          status = 'failed';
-          const body = await res.text().catch(() => '');
-          error = `Discord responded ${res.status}: ${body}`.slice(0, 500);
-        }
-      } catch (err) {
-        status = 'failed';
-        error = (err as Error).message?.slice(0, 500) ?? 'unknown error';
-      }
-    }
-
-    const row = this.notificationLog.create({
-      subscriberId: subscriber.id,
-      source: 'test',
-      referenceId: subscriber.id,
+    // Delegate to NotificationService.fanOut so the transport + log-write
+    // logic lives in one place. `source='test'`, `referenceId=subscriber.id`.
+    // The subscriber's `enabled` flag is intentionally ignored here
+    // (VAL-SUB-010 / VAL-SUB-014).
+    const rows = await this.notifications.fanOut(
+      [subscriber],
       payload,
-      status,
-      error,
-    });
-    const saved = await this.notificationLog.save(row);
-    return { id: saved.id };
+      'test',
+      subscriber.id,
+    );
+    const row = rows[0];
+    return { id: row.id };
   }
 
   // ---------- Helpers ----------

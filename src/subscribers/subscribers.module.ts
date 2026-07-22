@@ -2,14 +2,15 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Subscriber } from './entities/subscriber.entity';
 import { EonetCategory } from '../nasa/eonet/entities/eonet-category.entity';
-import { NotificationLog } from '../notifications/entities/notification-log.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SubscribersController } from './subscribers.controller';
 import { SubscribersService } from './subscribers.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Subscriber, EonetCategory, NotificationLog]),
+    TypeOrmModule.forFeature([Subscriber, EonetCategory]),
+    NotificationsModule,
     AuthModule,
   ],
   controllers: [SubscribersController],
