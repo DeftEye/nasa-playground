@@ -6,13 +6,15 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Home } from './pages/Home';
 import { ApodArchive } from './pages/ApodArchive';
+import { EonetFeed } from './pages/EonetFeed';
+import { NotificationsLog } from './pages/NotificationsLog';
 
 /**
- * Placeholder page components for routes owned by subsequent M4 features
- * (EONET, Notifications, Subscribers). They render inside the authenticated
- * `AppLayout` shell so the top-right user menu (Logout) is visible and
- * protected-route gating works end-to-end today. Each will be replaced by
- * its real implementation in its own feature.
+ * Placeholder page component for routes owned by subsequent M4 features
+ * (Subscribers). It renders inside the authenticated `AppLayout` shell so the
+ * top-right user menu (Logout) is visible and protected-route gating works
+ * end-to-end today. It will be replaced by its real implementation in its
+ * own feature.
  */
 function Placeholder({ label }: { label: string }) {
   return (
@@ -58,11 +60,11 @@ export const router = createBrowserRouter([
           },
           {
             path: '/eonet',
-            element: <Placeholder label="EONET Feed (coming soon)" />,
+            element: <EonetFeed />,
           },
           {
             path: '/notifications',
-            element: <Placeholder label="Notifications Log (coming soon)" />,
+            element: <NotificationsLog />,
           },
           {
             path: '/subscribers',
