@@ -4,13 +4,15 @@ import { PublicOnlyRoute } from './auth/PublicOnlyRoute';
 import { AppLayout } from './components/AppLayout';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { Home } from './pages/Home';
+import { ApodArchive } from './pages/ApodArchive';
 
 /**
  * Placeholder page components for routes owned by subsequent M4 features
- * (Home, Archive, EONET, Notifications, Subscribers). They render inside the
- * authenticated `AppLayout` shell so the top-right user menu (Logout) is
- * visible and protected-route gating works end-to-end today. Each will be
- * replaced by its real implementation in its own feature.
+ * (EONET, Notifications, Subscribers). They render inside the authenticated
+ * `AppLayout` shell so the top-right user menu (Logout) is visible and
+ * protected-route gating works end-to-end today. Each will be replaced by
+ * its real implementation in its own feature.
  */
 function Placeholder({ label }: { label: string }) {
   return (
@@ -48,11 +50,11 @@ export const router = createBrowserRouter([
         children: [
           {
             path: '/',
-            element: <Placeholder label="Home — today's APOD (coming soon)" />,
+            element: <Home />,
           },
           {
             path: '/apod/archive',
-            element: <Placeholder label="APOD Archive (coming soon)" />,
+            element: <ApodArchive />,
           },
           {
             path: '/eonet',
