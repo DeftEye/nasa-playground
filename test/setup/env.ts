@@ -7,3 +7,7 @@ process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '7d';
 // integration test app does not fire live/unguarded NASA requests on boot.
 // Scheduler behavior is exercised directly in apod.scheduler.spec.ts.
 process.env.APOD_BOOT_CATCHUP = 'false';
+// Disable the EONET scheduler's on-boot NASA fetch during tests for the same
+// reason. EONET scheduler behavior is exercised directly in
+// eonet.scheduler.spec.ts.
+process.env.EONET_BOOT_CATCHUP = 'false';

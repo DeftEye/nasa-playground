@@ -3,11 +3,13 @@ import { EonetCategory } from './eonet-category.entity';
 
 export type EonetStatus = 'open' | 'closed';
 
-export interface EonetGeometryPoint {
-  date: string;
-  type: string;
-  coordinates: unknown;
-}
+/**
+ * A single EONET geometry observation. Kept loose (record of unknown values)
+ * because EONET geometry entries carry extra fields like `magnitudeValue` /
+ * `magnitudeUnit` and large (1000+) coordinate arrays that must be preserved
+ * verbatim (architecture §4 / VAL-EONET-016).
+ */
+export type EonetGeometryPoint = Record<string, unknown>;
 
 @Entity('eonet_events')
 export class EonetEvent {

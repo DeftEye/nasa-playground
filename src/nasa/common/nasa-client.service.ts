@@ -9,10 +9,16 @@ export const APOD_TIMEOUT_MS = 15_000;
 export const EONET_TIMEOUT_MS = 30_000;
 
 const DEFAULT_APOD_BASE_URL = 'https://api.nasa.gov/planetary/apod';
+const DEFAULT_EONET_BASE_URL = 'https://eonet.gsfc.nasa.gov/api/v3';
 
 /** Resolves the APOD base URL, honoring an `APOD_BASE_URL` override (tests). */
 function apodBaseUrl(): string {
   return process.env.APOD_BASE_URL ?? DEFAULT_APOD_BASE_URL;
+}
+
+/** Resolves the EONET base URL, honoring an `EONET_BASE_URL` override (tests). */
+function eonetBaseUrl(): string {
+  return process.env.EONET_BASE_URL ?? DEFAULT_EONET_BASE_URL;
 }
 
 /** Resolves the APOD timeout, honoring an `APOD_TIMEOUT_MS` override (tests). */
@@ -24,6 +30,15 @@ function defaultApodTimeout(): number {
   return APOD_TIMEOUT_MS;
 }
 
+/** Resolves the EONET timeout, honoring an `EONET_TIMEOUT_MS` override (tests). */
+function defaultEonetTimeout(): number {
+  const fromEnv = Number(process.env.EONET_TIMEOUT_MS);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) {
+    return fromEnv;
+  }
+  return EONET_TIMEOUT_MS;
+}
+
 /** Raw NASA APOD response shape (subset of fields we persist). */
 export interface NasaApodResponse {
   date: string;
@@ -32,6 +47,52 @@ export interface NasaApodResponse {
   url: string;
   media_type: string;
   copyright?: string;
+}
+
+/** Raw EONET category payload from `/api/v3/categories`. */
+export interface EonetCategoryDto {
+  id: string;
+  title: string;
+  description?: string | null;
+  link?: string;
+}
+
+/** Raw EONET categories envelope. */
+export interface EonetCategoriesResponse {
+  categories: EonetCategoryDto[];
+}
+
+/** Raw EONET geometry observation entry. */
+export interface EonetGeometryDto {
+  date?: string;
+  type?: string;
+  coordinates?: unknown;
+  [key: string]: unknown;
+}
+
+/** Raw EONET event payload from `/api/v3/events`. */
+export interface EonetEventDto {
+  id: string;
+  title: string;
+  description?: string | null;
+  link: string;
+  closed?: string | null;
+  categories: Array<{ id: string; title: string }>;
+  geometry: unknown;
+}
+
+/** Raw EONET events envelope. */
+export interface EonetEventsResponse {
+  events: EonetEventDto[];
+}
+
+/** Query parameters for the EONET events endpoint. */
+export interface EonetEventsQuery {
+  status?: 'open' | 'closed';
+  start?: string;
+  end?: string;
+  category?: string;
+  limit?: number;
 }
 
 /**
@@ -85,6 +146,45 @@ export class NasaClientService {
       url.searchParams.set('date', date);
     }
     return this.getJson<NasaApodResponse>(url, timeoutMs);
+  }
+
+  /**
+   * Fetches the EONET categories list. Enforces the 30 s EONET timeout floor
+   * unless overridden via `EONET_TIMEOUT_MS` (tests).
+   */
+  getEonetCategories(
+    timeoutMs: number = defaultEonetTimeout(),
+  ): Promise<EonetCategoriesResponse> {
+    const url = new URL(`${eonetBaseUrl()}/categories`);
+    return this.getJson<EonetCategoriesResponse>(url, timeoutMs);
+  }
+
+  /**
+   * Fetches EONET events with optional filters. Enforces the 30 s EONET
+   * timeout floor unless overridden via `EONET_TIMEOUT_MS` (tests). The EONET
+   * events endpoint does not require an API key.
+   */
+  getEonetEvents(
+    query: EonetEventsQuery = {},
+    timeoutMs: number = defaultEonetTimeout(),
+  ): Promise<EonetEventsResponse> {
+    const url = new URL(`${eonetBaseUrl()}/events`);
+    if (query.status) {
+      url.searchParams.set('status', query.status);
+    }
+    if (query.start) {
+      url.searchParams.set('start', query.start);
+    }
+    if (query.end) {
+      url.searchParams.set('end', query.end);
+    }
+    if (query.category) {
+      url.searchParams.set('category', query.category);
+    }
+    if (query.limit !== undefined) {
+      url.searchParams.set('limit', String(query.limit));
+    }
+    return this.getJson<EonetEventsResponse>(url, timeoutMs);
   }
 
   /**
