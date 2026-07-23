@@ -1,0 +1,126 @@
+# NASA Sky Tracker — CI (VAL-CI-001/002/003).
+#
+# Runs on every push and pull_request targeting `master`. Steps mirror the
+# commands declared in `{missionDir}/services.yaml`:
+#   install (root + web), typecheck (root + web), lint:check (root + web,
+#   non-mutating — no --fix in CI), backend tests against a Postgres service
+#   container (creates nasa_sky_tracker + nasa_sky_tracker_test, honors
+#   maxWorkers:1 from package.json), frontend tests (vitest run), backend
+#   build, frontend build, and a docker build.
+#
+# No real secrets are referenced. JWT_SECRET / POSTGRES_* use throwaway,
+# non-secret test values. The backend-test step has a single automatic retry
+# to absorb a known intermittent auth test flake (see AGENTS.md "Known
+# Pre-Existing Issues"); a consistently-red run still fails the job.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# Cancel in-flight runs for the same ref when a new push lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    # Postgres service container for the backend-test step. On Linux hosted
+    # runners (no job-level `container:`) services are reachable at localhost.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nasa_sky_tracker
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nasa_sky_tracker"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    # Connection env for the test DB creation step and backend tests. JWT_SECRET
+    # is a non-secret throwaway; the test suite reads it via test/setup/env.ts.
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      JWT_SECRET: ci-test-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24 (with npm cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install web dependencies
+        run: cd web && npm ci
+
+      # The postgres service auto-creates `nasa_sky_tracker` (POSTGRES_DB).
+      # The Jest suite connects to `nasa_sky_tracker_test` (test/setup/env.ts
+      # sets POSTGRES_DB = POSTGRES_DB_TEST ?? 'nasa_sky_tracker_test'), so we
+      # also create that DB here. `pg` is already a root dependency.
+      - name: Create nasa_sky_tracker_test database
+        run: |
+          node -e "const{Client}=require('pg');const c=new Client({host:'localhost',port:5432,user:'postgres',password:'postgres',database:'nasa_sky_tracker'});c.connect().then(()=>c.query('CREATE DATABASE nasa_sky_tracker_test')).then(()=>{console.log('created nasa_sky_tracker_test');return c.end()}).catch(e=>{console.log('nasa_sky_tracker_test note:',e.message);process.exit(0)})"
+
+      - name: Typecheck root
+        run: npm run typecheck
+
+      - name: Typecheck web
+        run: cd web && npm run typecheck
+
+      # Non-mutating lint (no --fix). Root `lint:check` mirrors web `lint:check`.
+      - name: Lint check root
+        run: npm run lint:check
+
+      - name: Lint check web
+        run: cd web && npm run lint:check
+
+      # Backend tests against the postgres service container. NODE_ENV=test is
+      # honored by test/setup/env.ts; maxWorkers:1 is set in package.json jest
+      # config (serial — the shared test DB would TRUNCATE across parallel
+      # workers). A single automatic retry absorbs the known intermittent auth
+      # flake (AGENTS.md "Known Pre-Existing Issues"); a genuine failure fails
+      # the retry too, so the job still goes red.
+      - name: Backend tests
+        id: backend_tests
+        continue-on-error: true
+        env:
+          NODE_ENV: test
+        run: npm test
+
+      - name: Backend tests (retry on known flake)
+        if: steps.backend_tests.outcome == 'failure'
+        env:
+          NODE_ENV: test
+        run: npm test
+
+      - name: Frontend tests
+        run: cd web && npm run test -- --run
+
+      - name: Backend build
+        run: npm run build
+
+      - name: Frontend build
+        run: cd web && npm run build
+
+      - name: Docker build
+        run: docker build -t nasa-sky-tracker:ci .
