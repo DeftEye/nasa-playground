@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { validateEnv } from './config/env.validation';
 import { CustomersModule } from './customers/customers.module';
 import { AuthModule } from './auth/auth.module';
 import { NasaModule } from './nasa/nasa.module';
@@ -44,6 +45,11 @@ function maybeServeStatic(): DynamicModule[] {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // Startup env validation (VAL-ENV-001/002/003). Runs synchronously during
+      // `NestFactory.create`, BEFORE the HTTP port is bound. Throws on
+      // missing/invalid required configuration so the process fails fast with
+      // an error naming the offending variable. See `config/env.validation.ts`.
+      validate: validateEnv,
     }),
     ...maybeServeStatic(),
     CustomersModule,
