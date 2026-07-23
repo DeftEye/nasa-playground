@@ -476,15 +476,37 @@ export function EonetGlobe() {
                   </p>
                 )}
                 <p className="mt-2">
-                  <a
-                    data-testid="globe-event-link"
-                    href={selectedEvent.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    Open on NASA EONET ↗
-                  </a>
+                  {(() => {
+                    // Defensive guard: only render a clickable external href
+                    // when the link is a trusted https:// URL. The EONET
+                    // source today is always https://eonet.gsfc.nasa.gov/...,
+                    // but this belt-and-suspenders check on a user-facing
+                    // external link prevents a malformed/non-https `link`
+                    // (e.g. `javascript:` or `http://`) from becoming a live
+                    // navigation target. Non-https links render as inert
+                    // text (no href) so the row cannot be navigated.
+                    const link = selectedEvent.link ?? '';
+                    const isTrustedHttps = link.startsWith('https://');
+                    return isTrustedHttps ? (
+                      <a
+                        data-testid="globe-event-link"
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        Open on NASA EONET ↗
+                      </a>
+                    ) : (
+                      <span
+                        data-testid="globe-event-link"
+                        aria-disabled="true"
+                        className="font-medium text-gray-400 dark:text-gray-500"
+                      >
+                        Open on NASA EONET ↗
+                      </span>
+                    );
+                  })()}
                 </p>
               </div>
             </div>

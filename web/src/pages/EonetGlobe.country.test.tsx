@@ -192,6 +192,31 @@ function filteringMapHandler() {
   });
 }
 
+/** A window-aware map handler for VAL-COUNTRY-011 / VAL-GCROSS-007: the
+ *  loaded event set shrinks when the window narrows so the side panel of a
+ *  selected country re-derives observably. For days=7 the Paris event is
+ *  dropped (so France's panel empties); for days=14/30 all three events are
+ *  returned. Category/status filters are also honored so the handler stays
+ *  composable. */
+function windowFilteringMapHandler() {
+  return http.get('/api/nasa/eonet/events/map', ({ request }) => {
+    const url = new URL(request.url);
+    const days = Number(url.searchParams.get('days') ?? '30');
+    const category = url.searchParams.get('category');
+    const status = url.searchParams.get('status');
+    let events = days <= 7 ? ALL_EVENTS.filter((e) => e.id !== 'EONET_PARIS') : ALL_EVENTS;
+    if (category && category !== 'all') {
+      events = events.filter((e) => (e.categories ?? []).some((c) => c.id === category));
+    }
+    if (status && status !== 'all') {
+      events = events.filter((e) => e.status === status);
+    }
+    return HttpResponse.json(mapResponse(events, days as 7 | 14 | 30), {
+      status: 200,
+    });
+  });
+}
+
 function GlobeTree() {
   return (
     <Routes>
@@ -530,6 +555,41 @@ describe('M11 country selection — event detail and external link', () => {
     // Plotted events persist.
     expect(screen.getByTestId('globe-events-count').textContent).toBe('3');
   });
+
+  it('renders globe-event-link inert (no href) when the link is not https:// (misc-globe-polish)', async () => {
+    // Event with a non-https (javascript:) link — must NOT become a live
+    // navigation target. The fixture overrides Paris's link.
+    const malicious = {
+      ...MAP_EVENT_PARIS,
+      link: 'javascript:alert(1)',
+    };
+    server.use(categoriesHandler(), mapHandler([malicious]), countriesHandler());
+
+    renderWithProviders(<GlobeTree />, {
+      routerProps: { initialEntries: ['/globe'] },
+    });
+
+    await waitForCountriesLoaded();
+    await waitFor(() => {
+      expect(screen.getAllByTestId('globe-event-point').length).toBe(1);
+    });
+
+    fireEvent.click(screen.getByTestId('globe-event-point'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-event-detail')).toBeInTheDocument();
+    });
+
+    // The link element is rendered inert: no href attribute, not an <a>.
+    const link = screen.getByTestId('globe-event-link');
+    expect(link.tagName).not.toBe('A');
+    expect(link.getAttribute('href')).toBeNull();
+    expect(link.getAttribute('target')).toBeNull();
+    // Marked non-interactive for assistive tech.
+    expect(link.getAttribute('aria-disabled')).toBe('true');
+    // The malicious payload is not present as a navigable href anywhere.
+    expect(link.outerHTML).not.toContain('javascript:alert(1)');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -745,5 +805,213 @@ describe('M11 country selection — parity with the plotted mirror', () => {
       .find((r) => r.getAttribute('data-event-id') === 'EONET_PARIS')!;
     expect(point.getAttribute('data-category')).toBe(row.getAttribute('data-category'));
     expect(point.getAttribute('data-status')).toBe(row.getAttribute('data-status'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// misc-globe-polish: window-change re-derivation with a selection active
+// (VAL-COUNTRY-011 / VAL-GCROSS-007).
+// ---------------------------------------------------------------------------
+
+describe('misc-globe-polish — window change re-derives the side panel (VAL-COUNTRY-011 / VAL-GCROSS-007)', () => {
+  it('narrowing the window while France is selected drops Paris from the panel; selection persists', async () => {
+    server.use(categoriesHandler(), windowFilteringMapHandler(), countriesHandler());
+
+    renderWithProviders(<GlobeTree />, {
+      routerProps: { initialEntries: ['/globe'] },
+    });
+
+    await waitForCountriesLoaded();
+    // days=30 default → all 3 events loaded; Paris is in France.
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-events-count').textContent).toBe('3');
+    });
+
+    await selectViaHook('FRA');
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-country-events-count').textContent).toBe('1');
+    });
+    expect(
+      screen.getAllByTestId('globe-country-event').map((r) => r.getAttribute('data-event-id')),
+    ).toEqual(['EONET_PARIS']);
+
+    // Narrow the window to 7 days — the handler drops Paris, so the loaded
+    // set shrinks to 2 (LA + London) and the globe count updates.
+    fireEvent.change(screen.getByTestId('globe-filter-window'), {
+      target: { value: '7' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-events-count').textContent).toBe('2');
+    });
+    // VAL-COUNTRY-011: selection persists across the window change.
+    expect(screen.getByTestId('globe-selected-country').textContent).toBe('France');
+    expect(screen.getByTestId('globe-side-panel')).toBeInTheDocument();
+    // VAL-GCROSS-007: the panel re-derives from the new loaded set — Paris
+    // is gone, so France's panel empties.
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-country-events-count').textContent).toBe('0');
+    });
+    expect(screen.queryAllByTestId('globe-country-event')).toHaveLength(0);
+    expect(screen.getByTestId('globe-country-empty')).toBeInTheDocument();
+    // Paris is no longer plotted at all.
+    expect(
+      screen
+        .getAllByTestId('globe-event-point')
+        .some((p) => p.getAttribute('data-event-id') === 'EONET_PARIS'),
+    ).toBe(false);
+
+    // Widen back to 30 — Paris returns and France's panel repopulates.
+    fireEvent.change(screen.getByTestId('globe-filter-window'), {
+      target: { value: '30' },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-events-count').textContent).toBe('3');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-country-events-count').textContent).toBe('1');
+    });
+    expect(
+      screen.getAllByTestId('globe-country-event').map((r) => r.getAttribute('data-event-id')),
+    ).toEqual(['EONET_PARIS']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// misc-globe-polish: combined category + status intersection with a
+// selection active (VAL-GCROSS-006).
+// ---------------------------------------------------------------------------
+
+describe('misc-globe-polish — combined category + status intersection with a selection (VAL-GCROSS-006)', () => {
+  it('category+status intersection is applied across the globe and the USA side panel', async () => {
+    server.use(categoriesHandler(), filteringMapHandler(), countriesHandler());
+
+    renderWithProviders(<GlobeTree />, {
+      routerProps: { initialEntries: ['/globe'] },
+    });
+
+    await waitForCountriesLoaded();
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-events-count').textContent).toBe('3');
+    });
+
+    // USA contains LA (severeStorms, closed).
+    await selectViaHook('USA');
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-country-events-count').textContent).toBe('1');
+    });
+    expect(
+      screen.getAllByTestId('globe-country-event').map((r) => r.getAttribute('data-event-id')),
+    ).toEqual(['EONET_LA']);
+
+    // Intersection: category=severeStorms AND status=closed → only LA
+    // matches both. Globe count and USA panel both reflect the intersection.
+    fireEvent.change(screen.getByTestId('globe-filter-category'), {
+      target: { value: 'severeStorms' },
+    });
+    fireEvent.change(screen.getByTestId('globe-filter-status'), {
+      target: { value: 'closed' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-events-count').textContent).toBe('1');
+    });
+    expect(screen.getAllByTestId('globe-event-point')).toHaveLength(1);
+    expect(screen.getAllByTestId('globe-event-point')[0].getAttribute('data-category')).toBe('severeStorms');
+    expect(screen.getAllByTestId('globe-event-point')[0].getAttribute('data-status')).toBe('closed');
+    // Selection persists; panel re-derives to the intersection (still LA).
+    expect(screen.getByTestId('globe-selected-country').textContent).toBe('United States of America');
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-country-events-count').textContent).toBe('1');
+    });
+    expect(
+      screen.getAllByTestId('globe-country-event').map((r) => r.getAttribute('data-event-id')),
+    ).toEqual(['EONET_LA']);
+
+    // Flip category to wildfires (LA is severeStorms) — the intersection is
+    // now empty, so the globe empties AND the USA panel empties.
+    fireEvent.change(screen.getByTestId('globe-filter-category'), {
+      target: { value: 'wildfires' },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-events-count').textContent).toBe('0');
+    });
+    expect(screen.queryAllByTestId('globe-event-point')).toHaveLength(0);
+    expect(screen.getByTestId('globe-selected-country').textContent).toBe('United States of America');
+    expect(screen.getByTestId('globe-side-panel')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-country-events-count').textContent).toBe('0');
+    });
+    expect(screen.queryAllByTestId('globe-country-event')).toHaveLength(0);
+    expect(screen.getByTestId('globe-country-empty')).toBeInTheDocument();
+
+    // Reset both filters — globe + USA panel restore.
+    fireEvent.change(screen.getByTestId('globe-filter-category'), {
+      target: { value: 'all' },
+    });
+    fireEvent.change(screen.getByTestId('globe-filter-status'), {
+      target: { value: 'all' },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-events-count').textContent).toBe('3');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-country-events-count').textContent).toBe('1');
+    });
+    expect(
+      screen.getAllByTestId('globe-country-event').map((r) => r.getAttribute('data-event-id')),
+    ).toEqual(['EONET_LA']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// misc-globe-polish: selection UI absent / non-interactive in the map-error
+// path (VAL-COUNTRY-020).
+// ---------------------------------------------------------------------------
+
+describe('misc-globe-polish — selection UI absent in the map-error path (VAL-COUNTRY-020)', () => {
+  it('when the map endpoint errors, the side panel + test-select buttons are absent and the hook is non-interactive', async () => {
+    server.use(
+      categoriesHandler(),
+      http.get('/api/nasa/eonet/events/map', () =>
+        HttpResponse.json({ message: 'boom' }, { status: 500 }),
+      ),
+      countriesHandler(),
+    );
+
+    renderWithProviders(<GlobeTree />, {
+      routerProps: { initialEntries: ['/globe'] },
+    });
+
+    // Error state renders; the data-dependent block (globe area, mirror,
+    // side panel, hidden test-select buttons) does NOT render.
+    await waitFor(() => {
+      expect(screen.getByTestId('globe-error')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('globe-error-retry')).toBeInTheDocument();
+
+    // Default selected country reads "none" with no panel.
+    expect(screen.getByTestId('globe-selected-country').textContent).toBe('none');
+    expect(screen.queryByTestId('globe-side-panel')).toBeNull();
+    expect(screen.queryByTestId('globe-country-events')).toBeNull();
+    expect(screen.queryByTestId('globe-country-events-count')).toBeNull();
+
+    // The hidden test-select buttons are NOT rendered in the error path, so
+    // selection is not drivable from the DOM.
+    expect(screen.queryByTestId('globe-test-select-FRA')).toBeNull();
+    expect(screen.queryByTestId('globe-test-select-USA')).toBeNull();
+
+    // Graceful degradation: even if the window.__selectCountry hook is
+    // invoked, no side panel opens (the data-dependent block is gated on
+    // mapQuery.data, which is absent on error). The selection UI stays
+    // non-interactive.
+    await selectViaHook('FRA');
+    await waitFor(() => {
+      expect(screen.queryByTestId('globe-side-panel')).toBeNull();
+    });
+    expect(screen.queryByTestId('globe-country-events')).toBeNull();
+    expect(screen.queryByTestId('globe-country-events-count')).toBeNull();
+    // The error UI is still the dominant state.
+    expect(screen.getByTestId('globe-error')).toBeInTheDocument();
   });
 });
