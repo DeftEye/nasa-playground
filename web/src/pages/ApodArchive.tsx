@@ -25,6 +25,9 @@ import type { ApodEntry } from '../types';
  * - Image entries render an `<img>` thumbnail.
  * - Video entries (`mediaType==='video'` AND `videoUrl != null`) render an
  *   `<iframe>` to the embed URL (VAL-FE-ARCHIVE-004).
+ * - Video entries with `videoUrl == null` (non-embeddable host) render a
+ *   "Watch video" link to the source `url` (new tab, `rel=noopener
+ *   noreferrer`) instead of a broken `<img>` (VAL-FE-ARCHIVE-006).
  * - Long titles truncate with `truncate` (text-ellipsis).
  */
 const PAGE_SIZE = 20;
@@ -109,15 +112,15 @@ export function ApodArchive() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((entry: ApodEntry) => {
-          const isVideo =
-            entry.mediaType === 'video' && entry.videoUrl !== null;
+          const isVideo = entry.mediaType === 'video';
+          const hasEmbed = entry.videoUrl !== null;
           return (
             <article
               key={entry.date}
               className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
               data-testid="apod-archive-card"
             >
-              {isVideo ? (
+              {isVideo && hasEmbed ? (
                 <div className="aspect-video w-full bg-black">
                   <iframe
                     src={entry.videoUrl as string}
@@ -125,6 +128,21 @@ export function ApodArchive() {
                     className="h-full w-full"
                     data-testid="apod-archive-card-iframe"
                   />
+                </div>
+              ) : isVideo && !hasEmbed ? (
+                // Non-embeddable video: a "Watch video" link to the source
+                // `url` (new tab, `rel=noopener noreferrer`) instead of a
+                // broken `<img>` (VAL-FE-ARCHIVE-006).
+                <div className="flex aspect-video w-full items-center justify-center bg-black">
+                  <a
+                    href={entry.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    data-testid="apod-archive-card-watch-link"
+                  >
+                    <span aria-hidden="true">▶</span> Watch video
+                  </a>
                 </div>
               ) : (
                 <div className="aspect-video w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
