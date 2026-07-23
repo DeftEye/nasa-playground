@@ -282,11 +282,14 @@ describe('APOD (integration)', () => {
     expect(bad.status).toBe(400);
   });
 
-  // VAL-APOD-006 (video URL transform: YouTube -> embed, Vimeo -> NULL)
-  it('transforms YouTube video URL to embed form and leaves non-YouTube video URL NULL', async () => {
+  // VAL-APOD-006 + VAL-APOD-010 (video URL transform: YouTube -> embed,
+  // Vimeo -> player.vimeo.com embed, direct file -> null with url preserved)
+  it('transforms YouTube and Vimeo video URLs to embed form; leaves non-embeddable video URLs NULL while preserving the source url', async () => {
     const token = await loginAndGetToken(context);
     const ytDate = '2024-04-01';
     const vimeoDate = '2024-04-02';
+    const directDate = '2024-04-03';
+    const playerVimeoDate = '2024-04-04';
 
     nock(NASA_BASE)
       .get(APOD_PATH)
@@ -312,7 +315,32 @@ describe('APOD (integration)', () => {
         }),
         { 'content-type': 'application/json' },
       );
+    nock(NASA_BASE)
+      .get(APOD_PATH)
+      .query((q) => q.date === directDate)
+      .reply(
+        200,
+        apodMock({
+          date: directDate,
+          media_type: 'video',
+          url: 'https://example.com/clip.mp4',
+        }),
+        { 'content-type': 'application/json' },
+      );
+    nock(NASA_BASE)
+      .get(APOD_PATH)
+      .query((q) => q.date === playerVimeoDate)
+      .reply(
+        200,
+        apodMock({
+          date: playerVimeoDate,
+          media_type: 'video',
+          url: 'https://player.vimeo.com/video/67890',
+        }),
+        { 'content-type': 'application/json' },
+      );
 
+    // YouTube -> embed (unchanged behavior)
     const yt = await context.http
       .post('/api/nasa/triggers/fetch-apod')
       .query({ date: ytDate })
@@ -320,19 +348,48 @@ describe('APOD (integration)', () => {
     expect(yt.status).toBe(200);
     expect(asApod(yt).videoUrl).toBe('https://www.youtube.com/embed/abc123');
     expect(asApod(yt).mediaType).toBe('video');
+    expect(asApod(yt).url).toBe('https://www.youtube.com/watch?v=abc123');
 
+    // Vimeo watch URL -> player.vimeo.com embed
     const vimeo = await context.http
       .post('/api/nasa/triggers/fetch-apod')
       .query({ date: vimeoDate })
       .set('Authorization', `Bearer ${token}`);
     expect(vimeo.status).toBe(200);
-    expect(asApod(vimeo).videoUrl).toBeNull();
+    expect(asApod(vimeo).videoUrl).toBe('https://player.vimeo.com/video/12345');
     expect(asApod(vimeo).mediaType).toBe('video');
+    expect(asApod(vimeo).url).toBe('https://vimeo.com/12345');
+
+    // Direct .mp4 -> videoUrl null AND source url preserved
+    const direct = await context.http
+      .post('/api/nasa/triggers/fetch-apod')
+      .query({ date: directDate })
+      .set('Authorization', `Bearer ${token}`);
+    expect(direct.status).toBe(200);
+    expect(asApod(direct).videoUrl).toBeNull();
+    expect(asApod(direct).mediaType).toBe('video');
+    expect(asApod(direct).url).toBe('https://example.com/clip.mp4');
+
+    // player.vimeo.com/video/<id> -> same embed form
+    const playerVimeo = await context.http
+      .post('/api/nasa/triggers/fetch-apod')
+      .query({ date: playerVimeoDate })
+      .set('Authorization', `Bearer ${token}`);
+    expect(playerVimeo.status).toBe(200);
+    expect(asApod(playerVimeo).videoUrl).toBe(
+      'https://player.vimeo.com/video/67890',
+    );
+    expect(asApod(playerVimeo).mediaType).toBe('video');
 
     const ytRow = await getRow(ytDate);
     const vimeoRow = await getRow(vimeoDate);
+    const directRow = await getRow(directDate);
     expect(ytRow?.videoUrl).toBe('https://www.youtube.com/embed/abc123');
-    expect(vimeoRow?.videoUrl).toBeNull();
+    expect(ytRow?.url).toBe('https://www.youtube.com/watch?v=abc123');
+    expect(vimeoRow?.videoUrl).toBe('https://player.vimeo.com/video/12345');
+    expect(vimeoRow?.url).toBe('https://vimeo.com/12345');
+    expect(directRow?.videoUrl).toBeNull();
+    expect(directRow?.url).toBe('https://example.com/clip.mp4');
   });
 
   // VAL-APOD-007 (backfill idempotency)
