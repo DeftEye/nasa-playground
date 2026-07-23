@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PublicOnlyRoute } from './auth/PublicOnlyRoute';
@@ -9,6 +10,12 @@ import { ApodArchive } from './pages/ApodArchive';
 import { EonetFeed } from './pages/EonetFeed';
 import { NotificationsLog } from './pages/NotificationsLog';
 import { Subscribers } from './pages/Subscribers';
+import { Skeleton } from './components/Skeleton';
+
+// Lazy-load the /globe route so three.js + react-globe.gl (~595 KB gzip) stay
+// out of the initial app bundle (architecture §16.2 / VAL-GLOBE-027). The
+// chunk is only fetched on first navigation to /globe.
+const EonetGlobe = lazy(() => import('./pages/EonetGlobe'));
 
 /**
  * Placeholder page component for routes not yet implemented. Currently used
@@ -59,6 +66,20 @@ export const router = createBrowserRouter([
           {
             path: '/eonet',
             element: <EonetFeed />,
+          },
+          {
+            path: '/globe',
+            element: (
+              <Suspense
+                fallback={
+                  <div className="py-16">
+                    <Skeleton rows={4} />
+                  </div>
+                }
+              >
+                <EonetGlobe />
+              </Suspense>
+            ),
           },
           {
             path: '/notifications',

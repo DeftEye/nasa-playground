@@ -1,13 +1,13 @@
 # NASA Sky Tracker
 
-A NestJS backend that polls NASA's Astronomy Picture of the Day (APOD) and EONET natural events, persists both in Postgres, and pushes Discord notifications to opt-in subscribers. A Vite + React 19 + Tailwind v4 frontend in `web/` provides the visuals. Multi-user ready via email + password auth (Passport.js + JWT).
+A NestJS backend that polls NASA's Astronomy Picture of the Day (APOD) and EONET natural events, persists both in Postgres, and pushes Discord notifications to opt-in subscribers. A Vite + React 19 + Tailwind v4 frontend in `web/` provides the visuals, including an interactive 3D globe that plots recent EONET events. Multi-user ready via email + password auth (Passport.js + JWT).
 
 ## Stack
 
 - **Backend**: NestJS 11 + TypeORM 0.3 + Postgres 17 + Passport.js + JWT + bcrypt
 - **Schedulers**: `@nestjs/schedule` (cron + interval)
 - **HTTP client**: Node built-in `http`/`https` with typed wrapper (no SDK dep)
-- **Frontend**: Vite 8 + React 19 + TS + Tailwind v4 (`@tailwindcss/vite`) + React Router 7 + TanStack Query + axios + MSW 2 + Vitest 4 + RTL 16
+- **Frontend**: Vite 8 + React 19 + TS + Tailwind v4 (`@tailwindcss/vite`) + React Router 7 + TanStack Query + axios + MSW 2 + Vitest 4 + RTL 16 + react-globe.gl (three.js) + `@turf/boolean-point-in-polygon`
 - **Monorepo**: single `package.json` at repo root; Vite workspace in `web/`
 
 ## Quick Start
@@ -145,6 +145,7 @@ Subscribers are Discord notification targets owned by a user. Each subscriber ha
 | `POST` | `/api/nasa/triggers/fetch-apod` | Manual APOD fetch |
 | `GET` | `/api/nasa/eonet/categories` | EONET categories |
 | `GET` | `/api/nasa/eonet/events` | EONET events (filtered) |
+| `GET` | `/api/nasa/eonet/events/map` | Map-ready EONET events (one normalized `{lat, lng}` per event; rolling 7/14/30-day window; optional `category`/`status` filters) for the globe view |
 | `POST` | `/api/nasa/triggers/fetch-eonet` | Manual EONET fetch |
 | `GET` | `/api/nasa/health` | Health check (DB + NASA reachability) |
 
@@ -286,11 +287,14 @@ docker compose -f docker-compose.prod.yml down -v
     notifications/           Notification log, fan-out, Discord transport
   web/                       Vite + React + TS + Tailwind frontend
     src/
-      pages/                 Home, ApodArchive, EonetFeed, NotificationsLog, Subscribers, Login, Register
+      pages/                 Home, ApodArchive, EonetFeed, EonetGlobe, NotificationsLog, Subscribers, Login, Register
       components/            ApodHero, Skeleton, EmptyState, ErrorState, AppLayout, UserMenu
+      components/globe/      GlobeView (react-globe.gl), GlobeFilterBar, GlobeErrorBoundary, WebGL guard
       auth/                  AuthProvider, ProtectedRoute, PublicOnlyRoute
       api/                   axios client + per-domain wrappers
       test/                  MSW server, render helpers, setup
+    public/
+      countries.geojson      Natural Earth 110m countries (bundled; client-side country resolution via @turf)
   docker-compose.yml         Postgres 17
   .env.example               Environment variable template
 ```

@@ -8,6 +8,7 @@ import {
   EonetStatus,
   EonetGeometryPoint,
 } from './entities/eonet-event.entity';
+import { dateWindow, deriveMapPoint, MapPoint } from './eonet-map.helpers';
 import {
   NotificationService,
   FanOutPayload,
@@ -482,5 +483,110 @@ export class EonetService {
 
     const [data, total] = await qb.getManyAndCount();
     return { data, total, page: options.page, limit: options.limit };
+  }
+
+  /**
+   * Map-ready EONET events query (architecture §16.1 / VAL-MAP-001..025).
+   *
+   * Unlike {@link listEvents}, this joins the `categories` M2M so each event
+   * carries a non-empty `categories: [{id, title}]` array, filters to events
+   * whose most-recent geometry observation date (falling back to
+   * `firstSeenAt`) is within `[now - days, now]`, normalizes each event's
+   * `geometry` JSONB array to ONE representative `{lat, lng}` (Point passthrough,
+   * Polygon / MultiPolygon centroid), excludes events with no usable numeric
+   * coordinates, and returns a bare `{window, events}` envelope ordered by
+   * observation date DESC then id ASC. The existing list endpoint's contract
+   * and filters are NOT affected.
+   */
+  async listEventsForMap(options: {
+    days: number;
+    category?: string;
+    status?: 'open' | 'closed';
+  }): Promise<{
+    window: { days: number; from: string; to: string };
+    events: Array<{
+      id: string;
+      title: string;
+      status: EonetStatus;
+      date: string;
+      lat: number;
+      lng: number;
+      link: string;
+      categories: Array<{ id: string; title: string }>;
+    }>;
+  }> {
+    const now = new Date();
+    const { from, to } = dateWindow(options.days, now);
+
+    const qb = this.eventRepo
+      .createQueryBuilder('e')
+      .leftJoinAndSelect('e.categories', 'map_cat');
+
+    if (options.status) {
+      qb.andWhere('e.status = :status', { status: options.status });
+    }
+    if (options.category) {
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM eonet_event_categories ec WHERE ec.event_id = e.id AND ec.category_id = :category)`,
+        { category: options.category },
+      );
+    }
+
+    const rows = await qb.getMany();
+
+    const inWindow: Array<{
+      row: EonetEvent;
+      point: MapPoint;
+    }> = [];
+
+    for (const row of rows) {
+      const point: MapPoint | null = deriveMapPoint(
+        row.geometry,
+        row.firstSeenAt,
+      );
+      if (!point) {
+        continue;
+      }
+      // Window filter: most-recent geometry observation date (fallback
+      // firstSeenAt) must be within [from, to].
+      if (point.date < from || point.date > to) {
+        continue;
+      }
+      inWindow.push({ row, point });
+    }
+
+    inWindow.sort((a, b) => {
+      const am = a.point.date.getTime();
+      const bm = b.point.date.getTime();
+      if (am !== bm) {
+        return bm - am; // observation date DESC
+      }
+      return a.row.id.localeCompare(b.row.id); // id ASC tie-break
+    });
+
+    const events = inWindow.map(({ row, point }) => {
+      const categories = (row.categories ?? [])
+        .map((c) => ({ id: c.id, title: c.title }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+      return {
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        date: point.date.toISOString(),
+        lat: point.lat,
+        lng: point.lng,
+        link: row.link,
+        categories,
+      };
+    });
+
+    return {
+      window: {
+        days: options.days,
+        from: from.toISOString(),
+        to: to.toISOString(),
+      },
+      events,
+    };
   }
 }
