@@ -181,6 +181,29 @@ cd web && npm run lint                      # frontend
 
 Backend integration tests use a separate database `nasa_sky_tracker_test`. It is created automatically by `init.sh` or `services.yaml`'s `test_db` service. Jest runs with `maxWorkers: 1` (serial) because the test DB is shared across suites.
 
+## Continuous Integration
+
+GitHub Actions workflow at `.github/workflows/ci.yml` runs on every `push` and `pull_request` to `master`. The single `ci` job mirrors the local commands in `services.yaml`:
+
+1. `npm ci` (root) + `npm ci` (web)
+2. `npm run typecheck` (root + web)
+3. `npm run lint:check` (root + web) — non-mutating lint (no `--fix` in CI)
+4. `npm run build` (backend → `dist/`) — runs before tests because `prod-shutdown.spec.ts` spawns the compiled `dist/main`
+5. `npm test` (backend, against a `postgres:17` service container; `maxWorkers:1`; `NODE_ENV=test`; non-secret `POSTGRES_*/JWT_SECRET`)
+6. `cd web && npm run test -- --run` (frontend Vitest)
+7. `cd web && npm run build` (frontend → `web/dist/`)
+8. `docker build -t nasa-sky-tracker:ci .`
+
+No real secrets are referenced — `JWT_SECRET` and `POSTGRES_*` use non-secret throwaway values (the Postgres password is `pass123`, matching the value `prod-shutdown.spec.ts` hardcodes). The backend-test step has a single automatic retry to absorb a known intermittent auth test flake.
+
+Check run status:
+
+```bash
+gh run list                       # recent runs
+gh run view <run-id>              # step-by-step status
+gh run watch <run-id> --exit-status   # block until conclusion
+```
+
 ## Project Structure
 
 ```
