@@ -81,6 +81,15 @@ describe('pointInCountry', () => {
     // [48.85 lng, 2.35 lat] is outside this square.
     expect(pointInCountry(48.85, 2.35, franceFeature)).toBe(false);
   });
+
+  it('handles a point exactly on the border deterministically (turf inclusive)', () => {
+    // A vertex of the ring is on the border. turf's booleanPointInPolygon
+    // treats boundary points as inside (documented behavior). The assertion
+    // pins that deterministic result so a future regression is caught.
+    const onVertex = pointInCountry(-5, 41, franceFeature);
+    expect(typeof onVertex).toBe('boolean');
+    expect(onVertex).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

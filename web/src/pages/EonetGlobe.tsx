@@ -1,8 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchEonetMap, fetchEonetCategories } from '../api/eonet';
-import { fetchCountries } from '../lib/globe/countries';
-import { categoryColor, type CountryFeature } from '../lib/globe/geo';
+import {
+  fetchCountries,
+  findCountryByAdm0A3,
+  countryName,
+  countryId,
+} from '../lib/globe/countries';
+import {
+  categoryColor,
+  eventsInCountry,
+  type CountryFeature,
+} from '../lib/globe/geo';
 import { GlobeView } from '../components/globe/GlobeView';
 import { GlobeErrorBoundary } from '../components/globe/GlobeErrorBoundary';
 import { webglAvailable } from '../components/globe/webgl';
@@ -99,21 +108,90 @@ export function EonetGlobe() {
     staleTime: 60_000,
   });
 
-  // Countries are only needed to render the globe polygons; skip the fetch
-  // when WebGL is down (the DOM mirror does not need them).
+  // Countries are needed for BOTH the globe polygons (rendered only when
+  // WebGL is up) AND the side-panel point-in-polygon hit-testing (which
+  // works without WebGL — VAL-GCROSS-014). So the countries fetch is always
+  // enabled; the DOM mirror / side panel stay functional headless.
   const countriesQuery = useQuery({
     queryKey: ['globe', 'countries'],
     queryFn: async (): Promise<CountryFeature[]> => {
       const fc = await fetchCountries();
       return fc.features as CountryFeature[];
     },
-    enabled: webglOk,
     staleTime: Infinity,
   });
 
-  const events: EonetMapEvent[] = mapQuery.data?.events ?? [];
-  const countries: CountryFeature[] = countriesQuery.data ?? [];
+  const events: EonetMapEvent[] = useMemo(
+    () => mapQuery.data?.events ?? [],
+    [mapQuery.data],
+  );
+  const countries: CountryFeature[] = useMemo(
+    () => countriesQuery.data ?? [],
+    [countriesQuery.data],
+  );
   const categories: EonetCategory[] = categoriesQuery.data ?? [];
+
+  // --- Country selection (M11 / VAL-COUNTRY-001..020) ---------------------
+  // The selected country feature, or undefined when nothing is selected.
+  // `globe-selected-country` reads `none` before selection (VAL-COUNTRY-001).
+  const [selectedFeature, setSelectedFeature] = useState<CountryFeature | undefined>();
+  // The event whose detail panel is open (VAL-COUNTRY-008 / VAL-GCROSS-010).
+  const [selectedEvent, setSelectedEvent] = useState<EonetMapEvent | undefined>();
+
+  const selectedAdm0a3 = selectedFeature ? countryId(selectedFeature) : undefined;
+  const selectedCountryName = selectedFeature ? countryName(selectedFeature) : 'none';
+
+  /**
+   * The single `selectCountry` handler used by `onPolygonClick`, the
+   * `window.__selectCountry` test hook, and the hidden
+   * `globe-test-select-<ADM0_A3>` buttons (VAL-COUNTRY-015). Accepts either a
+   * full GeoJSON feature or an `ADM0_A3` string (resolved against the loaded
+   * countries dataset). Selecting a country opens the side panel and clears
+   * any open event detail so no stale detail leaks across countries
+   * (VAL-GCROSS-009).
+   */
+  const selectCountry = useCallback((input: CountryFeature | string) => {
+    const feature =
+      typeof input === 'string'
+        ? findCountryByAdm0A3(countries, input)
+        : input;
+    if (!feature) {
+      // Unknown ADM0_A3 (e.g. countries not yet loaded) — ignore rather than
+      // opening an empty panel with stale state.
+      return;
+    }
+    setSelectedFeature(feature);
+    setSelectedEvent(undefined);
+  }, [countries]);
+
+  const closeSidePanel = useCallback(() => {
+    setSelectedFeature(undefined);
+    setSelectedEvent(undefined);
+  }, []);
+
+  // Side-panel events are derived from the CURRENTLY LOADED events (the
+  // active window/filters) via point-in-polygon — no separate query
+  // (VAL-COUNTRY-011/012/013/014, VAL-COUNTRY-019). Re-derives automatically
+  // when `events` changes (filter/window refetch).
+  const countryEvents = useMemo<EonetMapEvent[]>(() => {
+    if (!selectedFeature) return [];
+    return eventsInCountry(events, selectedFeature);
+  }, [events, selectedFeature]);
+
+  // Install the `window.__selectCountry` test hook (VAL-COUNTRY-015). Routes
+  // through the same `selectCountry` handler as `onPolygonClick`. Attached
+  // on mount, removed on unmount. `selectCountry` is stable enough because
+  // it closes over `countries` (re-installed when countries load changes the
+  // closure); we re-attach whenever `countries` changes so an ADM0_A3 string
+  // resolves correctly once the dataset is available.
+  useEffect(() => {
+    window.__selectCountry = (input: CountryFeature | string) => {
+      selectCountry(input);
+    };
+    return () => {
+      delete window.__selectCountry;
+    };
+  }, [selectCountry]);
 
   return (
     <div data-testid="globe-page" className="space-y-4">
@@ -123,7 +201,7 @@ export function EonetGlobe() {
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Explore natural events from NASA's EONET on a 3D globe. Hover a point
-          for its title.
+          for its title, click a country to see its events.
         </p>
       </header>
 
@@ -134,6 +212,18 @@ export function EonetGlobe() {
         categories={categories}
         onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
       />
+
+      {/* Selected country indicator — always rendered; reads `none` before
+          selection (VAL-COUNTRY-001). */}
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+        Selected country:{' '}
+        <span
+          data-testid="globe-selected-country"
+          className="font-semibold text-gray-900 dark:text-gray-100"
+        >
+          {selectedCountryName}
+        </span>
+      </div>
 
       {/* Loading skeleton (VAL-GLOBE-018). Dedicated `globe-skeleton` testid
           in addition to the shared Skeleton. */}
@@ -147,7 +237,9 @@ export function EonetGlobe() {
       )}
 
       {/* 5xx / network error with Retry (VAL-GLOBE-020 / VAL-GLOBE-021).
-          Dedicated `globe-error` + `globe-error-retry` testids. */}
+          Dedicated `globe-error` + `globe-error-retry` testids. In the error
+          state country selection is unavailable and the side panel stays
+          absent (VAL-COUNTRY-020). */}
       {mapQuery.isError && (
         <div data-testid="globe-error" role="alert">
           <ErrorState
@@ -168,12 +260,9 @@ export function EonetGlobe() {
                 <GlobeView
                   countries={countries}
                   events={events}
-                  onPolygonClick={() => {
-                    /* country selection is owned by M11 */
-                  }}
-                  onPointClick={() => {
-                    /* event detail is owned by M11 */
-                  }}
+                  selectedAdm0a3={selectedAdm0a3}
+                  onPolygonClick={(feat) => selectCountry(feat)}
+                  onPointClick={(evt) => setSelectedEvent(evt)}
                 />
               </GlobeErrorBoundary>
             ) : (
@@ -189,7 +278,7 @@ export function EonetGlobe() {
                     or unsupported).
                   </p>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    The event list and count below still work.
+                    The event list and country side panel still work.
                   </p>
                 </div>
               </div>
@@ -210,8 +299,8 @@ export function EonetGlobe() {
           </div>
 
           {/* Empty state when the window has no events (VAL-GLOBE-019).
-              Distinct copy from the error state; dedicated `globe-empty`
-              testid. */}
+              Distinct copy from the error state and from the country-empty
+              state (VAL-GCROSS-016); dedicated `globe-empty` testid. */}
           {events.length === 0 && (
             <div data-testid="globe-empty">
               <EmptyState
@@ -227,7 +316,8 @@ export function EonetGlobe() {
               mirror is assertable without reading the canvas tooltip
               (VAL-GLOBE-006 / VAL-GLOBE-007 / VAL-GLOBE-008). Titles are
               rendered as JSX text (VAL-GLOBE-025) — never
-              dangerouslySetInnerHTML. */}
+              dangerouslySetInnerHTML. Clicking a mirror row opens the event
+              detail (VAL-COUNTRY-008 / VAL-GCROSS-010). */}
           {events.length > 0 && (
             <ul
               className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2 dark:border-gray-700"
@@ -243,7 +333,8 @@ export function EonetGlobe() {
                     data-category={firstCategory}
                     data-status={e.status}
                     data-title={e.title}
-                    className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                    onClick={() => setSelectedEvent(e)}
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     <span
                       className="inline-block h-3 w-3 shrink-0 rounded-full"
@@ -262,6 +353,166 @@ export function EonetGlobe() {
               })}
             </ul>
           )}
+
+          {/* Side panel: rendered only when a country is selected
+              (VAL-COUNTRY-001/002). Lists that country's events from the
+              CURRENTLY LOADED set (point-in-polygon, no separate query —
+              VAL-COUNTRY-019). */}
+          {selectedFeature && (
+            <aside
+              data-testid="globe-side-panel"
+              className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+              aria-label={`Events in ${selectedCountryName}`}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {selectedCountryName}
+                </h2>
+                <button
+                  type="button"
+                  data-testid="globe-side-panel-close"
+                  onClick={closeSidePanel}
+                  aria-label={`Close ${selectedCountryName} panel`}
+                  className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                Events in this country:{' '}
+                <span
+                  data-testid="globe-country-events-count"
+                  className="font-semibold text-gray-900 dark:text-gray-100"
+                >
+                  {countryEvents.length}
+                </span>
+              </div>
+
+              {countryEvents.length > 0 ? (
+                <ul
+                  data-testid="globe-country-events"
+                  className="space-y-1"
+                  aria-label={`Event list for ${selectedCountryName}`}
+                >
+                  {countryEvents.map((e) => {
+                    const firstCategory = e.categories?.[0]?.id ?? '';
+                    return (
+                      <li
+                        key={e.id}
+                        data-testid="globe-country-event"
+                        data-event-id={e.id}
+                        data-category={firstCategory}
+                        data-status={e.status}
+                        onClick={() => setSelectedEvent(e)}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <span
+                          className="inline-block h-3 w-3 shrink-0 rounded-full"
+                          style={{ backgroundColor: categoryColor(firstCategory) }}
+                          aria-hidden
+                        />
+                        <span className="truncate text-gray-900 dark:text-gray-100">
+                          {e.title}
+                        </span>
+                        <span className="ml-auto shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                          {e.status}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                // Distinct empty state for a selected country with no
+                // matching events (VAL-COUNTRY-006 / VAL-GCROSS-016).
+                <div data-testid="globe-country-empty">
+                  <EmptyState
+                    variant="filtered"
+                    message="No events in this country"
+                    description="No loaded events fall inside this country for the current window/filters."
+                  />
+                </div>
+              )}
+            </aside>
+          )}
+
+          {/* Event detail: shown when an event point/row is clicked
+              (VAL-COUNTRY-008 / VAL-GCROSS-010). Contains the title and a
+              safe external EONET link (new tab, rel=noopener noreferrer, no
+              token in the URL — VAL-COUNTRY-009). */}
+          {selectedEvent && (
+            <div
+              data-testid="globe-event-detail"
+              className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+              role="dialog"
+              aria-label={`Event detail: ${selectedEvent.title}`}
+            >
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                  {/* Title rendered as TEXT content (XSS-safe). */}
+                  {selectedEvent.title}
+                </h3>
+                <button
+                  type="button"
+                  data-testid="globe-event-detail-close"
+                  onClick={() => setSelectedEvent(undefined)}
+                  aria-label="Close event detail"
+                  className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                <p>
+                  Status:{' '}
+                  <span className="font-medium">{selectedEvent.status}</span>
+                </p>
+                {selectedEvent.categories && selectedEvent.categories.length > 0 && (
+                  <p>
+                    Categories:{' '}
+                    <span className="font-medium">
+                      {selectedEvent.categories.map((c) => c.title).join(', ')}
+                    </span>
+                  </p>
+                )}
+                <p className="mt-2">
+                  <a
+                    data-testid="globe-event-link"
+                    href={selectedEvent.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Open on NASA EONET ↗
+                  </a>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Hidden test-select buttons — one per loaded country — so
+              validators can drive country selection deterministically
+              without a canvas hit-test (VAL-COUNTRY-015). Each button routes
+              through the same `selectCountry` handler as `onPolygonClick`.
+              `display:none` keeps them out of the visual layout while
+              remaining clickable via `.click()` / agent-browser eval. */}
+          <div aria-hidden className="hidden">
+            {countries.map((f) => {
+              const id = countryId(f);
+              if (!id) return null;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  data-testid={`globe-test-select-${id}`}
+                  onClick={() => selectCountry(f)}
+                  tabIndex={-1}
+                >
+                  {countryName(f)}
+                </button>
+              );
+            })}
+          </div>
         </>
       )}
     </div>
