@@ -4,6 +4,13 @@ export class InitialSchema1784792437520 implements MigrationInterface {
   name = 'InitialSchema1784792437520';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Idempotent: ensure the uuid-ossp extension exists before any table that
+    // uses uuid_generate_v4() as a column DEFAULT. On a truly fresh Postgres
+    // volume (M7 prod container / CI service container) the extension is NOT
+    // pre-installed, and migration:run would otherwise fail with
+    // "function uuid_generate_v4() does not exist". Not dropped in down() to
+    // avoid breaking other objects that may depend on it.
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
     await queryRunner.query(
       `CREATE TYPE "public"."eonet_events_status_enum" AS ENUM('open', 'closed')`,
     );

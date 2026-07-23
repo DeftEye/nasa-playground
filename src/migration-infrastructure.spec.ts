@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
-import AppDataSource from '../data-source';
-import { InitialSchema1784792437520 } from './1784792437520-InitialSchema';
+import AppDataSource from './data-source';
+import { InitialSchema1784792437520 } from './migrations/1784792437520-InitialSchema';
 
 /**
  * Regression guard for the M6 migration infrastructure (VAL-MIG-001).
