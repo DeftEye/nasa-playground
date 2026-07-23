@@ -94,6 +94,13 @@ jobs:
       - name: Lint check web
         run: cd web && npm run lint:check
 
+      # Build the backend BEFORE tests: src/prod-shutdown.spec.ts (VAL-HARD-002)
+      # spawns the compiled `dist/main` and sends SIGTERM, so `dist/main.js` must
+      # exist when the Jest suite runs. (Locally `dist/` already exists from
+      # prior builds; in a fresh CI checkout it does not.)
+      - name: Backend build
+        run: npm run build
+
       # Backend tests against the postgres service container. NODE_ENV=test is
       # honored by test/setup/env.ts; maxWorkers:1 is set in package.json jest
       # config (serial — the shared test DB would TRUNCATE across parallel
@@ -115,9 +122,6 @@ jobs:
 
       - name: Frontend tests
         run: cd web && npm run test -- --run
-
-      - name: Backend build
-        run: npm run build
 
       - name: Frontend build
         run: cd web && npm run build
