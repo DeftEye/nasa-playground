@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse, delay } from 'msw';
+import { http, HttpResponse, delay, type JsonBodyType } from 'msw';
 import { Routes, Route } from 'react-router-dom';
 import { renderWithProviders } from '../test/render';
 import { ApodArchive } from './ApodArchive';
 import { server } from '../test/server';
+import { AUTH_TOKEN_KEY } from '../api/client';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -381,5 +382,315 @@ describe('ApodArchive — 5xx error and retry', () => {
     const errorState = await screen.findByTestId('error-state');
     expect(errorState).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VAL-PRODFIX-007: UI backfill control populates and refreshes history
+// ---------------------------------------------------------------------------
+//
+// The Archive page exposes a "Backfill 30 days" control
+// (`apod-backfill-button`) that POSTs to both backfill trigger endpoints
+// with the auth header, disables itself while in-flight, shows a status
+// message (`apod-backfill-status`), and on success invalidates the archive
+// react-query cache so the list refetches and shows the newly backfilled
+// entries.
+
+const TOKEN = 'test-jwt-token';
+const ME = {
+  id: 'u-1',
+  email: 'tester@example.com',
+  createdAt: '2025-07-22T10:00:00.000Z',
+};
+
+function authMeHandler() {
+  return http.get('/api/auth/me', ({ request }) => {
+    // Echo the bearer so tests can confirm the bootstrap call is authed too.
+    const auth = request.headers.get('authorization') ?? '';
+    if (!auth.startsWith('Bearer ')) {
+      return HttpResponse.json({ message: 'unauthorized' }, { status: 401 });
+    }
+    return HttpResponse.json(ME, { status: 200 });
+  });
+}
+
+interface CapturedRequest {
+  url: string;
+  auth: string | null;
+  body: unknown;
+}
+
+function backfillApodHandler(
+  captured: CapturedRequest[] = [],
+  response: JsonBodyType | (() => JsonBodyType) = [],
+  status = 200,
+  delayMs = 0,
+) {
+  return http.post('/api/nasa/triggers/backfill-apod', async ({ request }) => {
+    captured.push({
+      url: request.url,
+      auth: request.headers.get('authorization'),
+      body: null,
+    });
+    const body = typeof response === 'function' ? response() : response;
+    if (delayMs > 0) await delay(delayMs);
+    return HttpResponse.json(body, { status });
+  });
+}
+
+function backfillEonetHandler(
+  captured: CapturedRequest[] = [],
+  status = 200,
+  delayMs = 0,
+) {
+  return http.post('/api/nasa/triggers/backfill-eonet', async ({ request }) => {
+    captured.push({
+      url: request.url,
+      auth: request.headers.get('authorization'),
+      body: null,
+    });
+    if (delayMs > 0) await delay(delayMs);
+    return HttpResponse.json(
+      { detected: [], updated: [], skipped: [], unchanged: [] },
+      { status },
+    );
+  });
+}
+
+/**
+ * A list handler whose total grows from `initialTotal` to `backfilledTotal`
+ * after the first request. This simulates the archive refetch after a
+ * successful backfill invalidation surfacing newly populated rows.
+ */
+function growingListHandler(
+  initialTotal: number,
+  backfilledTotal: number,
+  captured: { count: number } = { count: 0 },
+) {
+  return http.get('/api/nasa/apod', ({ request }) => {
+    captured.count += 1;
+    const total = captured.count <= 1 ? initialTotal : backfilledTotal;
+    const url = new URL(request.url);
+    const page = Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1;
+    const limit =
+      Number.parseInt(url.searchParams.get('limit') ?? String(PAGE_SIZE), 10) ||
+      PAGE_SIZE;
+    return HttpResponse.json(makeList(total, page, limit), { status: 200 });
+  });
+}
+
+describe('ApodArchive — VAL-PRODFIX-007 backfill control renders', () => {
+  beforeEach(() => {
+    localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
+  });
+
+  it('renders a Backfill 30 days button on the archive page', async () => {
+    server.use(authMeHandler(), listHandler(5));
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    await screen.findAllByTestId('apod-archive-card');
+    expect(
+      screen.getByTestId('apod-backfill-button'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('apod-backfill-button')).toHaveTextContent(
+      /backfill 30 days/i,
+    );
+  });
+
+  it('renders the backfill button in the empty state too', async () => {
+    server.use(authMeHandler(), emptyListHandler());
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    await screen.findByTestId('empty-state');
+    expect(
+      screen.getByTestId('apod-backfill-button'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('ApodArchive — VAL-PRODFIX-007 click fires both POSTs with auth', () => {
+  beforeEach(() => {
+    localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
+  });
+
+  it('POSTs to backfill-apod?days=30 and backfill-eonet with the bearer token', async () => {
+    const user = userEvent.setup();
+    const apodCalls: CapturedRequest[] = [];
+    const eonetCalls: CapturedRequest[] = [];
+    server.use(
+      authMeHandler(),
+      listHandler(5),
+      backfillApodHandler(apodCalls, []),
+      backfillEonetHandler(eonetCalls),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    await screen.findAllByTestId('apod-archive-card');
+    await user.click(screen.getByTestId('apod-backfill-button'));
+
+    await waitFor(() => {
+      expect(apodCalls).toHaveLength(1);
+    });
+    await waitFor(() => {
+      expect(eonetCalls).toHaveLength(1);
+    });
+
+    // backfill-apod must be called with days=30 and the Authorization header.
+    const apodUrl = new URL(apodCalls[0].url);
+    expect(apodUrl.searchParams.get('days')).toBe('30');
+    expect(apodCalls[0].auth).toBe(`Bearer ${TOKEN}`);
+
+    // backfill-eonet must carry the Authorization header too.
+    expect(eonetCalls[0].auth).toBe(`Bearer ${TOKEN}`);
+  });
+});
+
+describe('ApodArchive — VAL-PRODFIX-007 button disabled while pending', () => {
+  beforeEach(() => {
+    localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
+  });
+
+  it('disables the button and shows a pending status while in-flight', async () => {
+    const user = userEvent.setup();
+    server.use(
+      authMeHandler(),
+      listHandler(5),
+      // Delay the backfill responses so we can observe the pending state.
+      backfillApodHandler([], [], 200, 500),
+      backfillEonetHandler([], 200, 500),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    await screen.findAllByTestId('apod-archive-card');
+    const button = screen.getByTestId('apod-backfill-button');
+    expect(button).not.toBeDisabled();
+
+    await user.click(button);
+
+    // While in-flight the button is disabled and reflects a pending state.
+    await waitFor(() => {
+      expect(screen.getByTestId('apod-backfill-button')).toBeDisabled();
+    });
+    expect(screen.getByTestId('apod-backfill-button')).toHaveTextContent(
+      /backfilling/i,
+    );
+    const status = screen.getByTestId('apod-backfill-status');
+    expect(status).toHaveTextContent(/backfilling history/i);
+
+    // After the responses resolve the button re-enables.
+    await waitFor(() => {
+      expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
+    });
+  });
+});
+
+describe('ApodArchive — VAL-PRODFIX-007 invalidation + refetch on success', () => {
+  beforeEach(() => {
+    localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
+  });
+
+  it('on success invalidates the archive cache so the list refetches with more entries', async () => {
+    const user = userEvent.setup();
+    const listCalls = { count: 0 };
+    server.use(
+      authMeHandler(),
+      growingListHandler(5, 30, listCalls),
+      backfillApodHandler([], makeList(30, 1).data),
+      backfillEonetHandler(),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    // Initially 5 entries (page 1).
+    const cardsBefore = await screen.findAllByTestId('apod-archive-card');
+    expect(cardsBefore).toHaveLength(5);
+    expect(listCalls.count).toBe(1);
+
+    await user.click(screen.getByTestId('apod-backfill-button'));
+
+    // The archive query is invalidated and refetches; the second list call
+    // returns total=30 → page 1 shows 20 cards.
+    await waitFor(() => {
+      expect(listCalls.count).toBeGreaterThanOrEqual(2);
+    });
+    const cardsAfter = await screen.findAllByTestId('apod-archive-card');
+    expect(cardsAfter).toHaveLength(20);
+
+    // A success status message is shown.
+    const status = screen.getByTestId('apod-backfill-status');
+    expect(status).toHaveTextContent(/backfill complete/i);
+  });
+});
+
+describe('ApodArchive — VAL-PRODFIX-007 error path handling', () => {
+  beforeEach(() => {
+    localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
+  });
+
+  it('shows an error status and re-enables the button when backfill-apod fails', async () => {
+    const user = userEvent.setup();
+    server.use(
+      authMeHandler(),
+      listHandler(5),
+      backfillApodHandler([], { message: 'days must be an integer between 1 and 30' }, 500),
+      backfillEonetHandler(),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    await screen.findAllByTestId('apod-archive-card');
+    await user.click(screen.getByTestId('apod-backfill-button'));
+
+    // The error status surfaces the backend message and the button re-enables.
+    const status = await screen.findByTestId('apod-backfill-status');
+    expect(status).toHaveTextContent(/backfill failed|integer between 1 and 30/i);
+    await waitFor(() => {
+      expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
+    });
+  });
+
+  it('shows an error status when backfill-eonet fails but apod succeeds', async () => {
+    const user = userEvent.setup();
+    const apodCalls: CapturedRequest[] = [];
+    server.use(
+      authMeHandler(),
+      listHandler(5),
+      backfillApodHandler(apodCalls, []),
+      http.post('/api/nasa/triggers/backfill-eonet', () =>
+        HttpResponse.json({ message: 'EONET backfill failed' }, { status: 500 }),
+      ),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    await screen.findAllByTestId('apod-archive-card');
+    await user.click(screen.getByTestId('apod-backfill-button'));
+
+    const status = await screen.findByTestId('apod-backfill-status');
+    expect(status).toHaveTextContent(/eonet backfill failed|backfill failed/i);
+    // APOD backfill still succeeded, so the error path surfaces but the
+    // button is re-enabled.
+    await waitFor(() => {
+      expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
+    });
+    expect(apodCalls).toHaveLength(1);
   });
 });

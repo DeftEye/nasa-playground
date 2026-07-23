@@ -49,3 +49,21 @@ export async function triggerApodFetch(
   );
   return data;
 }
+
+/**
+ * Backfill the last `days` (default 30, max 30) consecutive dated APOD rows
+ * via the JWT-guarded `POST /api/nasa/triggers/backfill-apod?days=` endpoint
+ * (VAL-PRODFIX-004 / VAL-PRODFIX-007). Idempotent: a re-run upserts each
+ * date (no duplicates), only refreshing `fetched_at`. Returns the upserted
+ * entries.
+ */
+export async function triggerApodBackfill(
+  days: number = 30,
+): Promise<ApodEntry[]> {
+  const { data } = await apiClient.post<ApodEntry[]>(
+    '/nasa/triggers/backfill-apod',
+    undefined,
+    { params: { days } },
+  );
+  return data;
+}

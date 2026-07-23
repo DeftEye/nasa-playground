@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { fetchApodArchive } from '../api/apod';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchApodArchive, triggerApodBackfill } from '../api/apod';
+import { triggerEonetBackfill } from '../api/eonet';
 import { Skeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorState } from '../components/ErrorState';
@@ -35,6 +36,119 @@ const PAGE_SIZE = 20;
 function parsePageParam(value: string | null): number {
   const n = Number.parseInt(value ?? '1', 10);
   return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+type BackfillStatus =
+  | { kind: 'idle' }
+  | { kind: 'pending' }
+  | { kind: 'success'; message: string }
+  | { kind: 'error'; message: string };
+
+/** Returns the rejection reason of a settled promise, or `null` if fulfilled. */
+function rejectReason<T>(result: PromiseSettledResult<T>): unknown | null {
+  return result.status === 'rejected' ? result.reason : null;
+}
+
+/**
+ * "Backfill 30 days" control (VAL-PRODFIX-007). An authenticated user can
+ * populate APOD (+ EONET) history on demand by clicking the button, which
+ * POSTs to the JWT-guarded backfill trigger endpoints via the authed axios
+ * client (`apiClient`, baseURL `/api`):
+ * - `POST /api/nasa/triggers/backfill-apod?days=30`
+ * - `POST /api/nasa/triggers/backfill-eonet`
+ *
+ * While in-flight the button is disabled (pending state). A status message
+ * (`apod-backfill-status`) reflects success/error. On success the APOD
+ * archive react-query cache is invalidated so the list refetches and shows
+ * the newly backfilled entries.
+ */
+function BackfillControl() {
+  const queryClient = useQueryClient();
+  const [status, setStatus] = useState<BackfillStatus>({ kind: 'idle' });
+
+  async function handleBackfill() {
+    setStatus({ kind: 'pending' });
+    try {
+      // Fire both backfill triggers. The APOD backfill is the one that
+      // populates the archive; the EONET backfill keeps event history fresh
+      // in lockstep (the control backfills both NASA feeds at once).
+      const [apodResult, eonetResult] = await Promise.allSettled([
+        triggerApodBackfill(30),
+        triggerEonetBackfill(),
+      ]);
+
+      // Invalidate the archive cache regardless of the EONET result so any
+      // newly upserted APOD rows surface. Only invalidate when the APOD
+      // backfill itself succeeded.
+      if (apodResult.status === 'fulfilled') {
+        await queryClient.invalidateQueries({ queryKey: ['apod', 'archive'] });
+      }
+
+      if (apodResult.status === 'rejected' || eonetResult.status === 'rejected') {
+        const failed = rejectReason(apodResult) ?? rejectReason(eonetResult);
+        const message =
+          (failed as { response?: { data?: { message?: string } } })?.response?.data
+            ?.message ??
+          (failed instanceof Error ? failed.message : 'Backfill failed. Please try again.');
+        setStatus({ kind: 'error', message });
+        return;
+      }
+
+      const count = apodResult.value.length;
+      setStatus({
+        kind: 'success',
+        message:
+          count > 0
+            ? `Backfill complete — ${count} APOD entries refreshed.`
+            : 'Backfill complete. Archive refreshed.',
+      });
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ??
+        (err instanceof Error ? err.message : 'Backfill failed. Please try again.');
+      setStatus({ kind: 'error', message });
+    }
+  }
+
+  const isPending = status.kind === 'pending';
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button
+        type="button"
+        onClick={handleBackfill}
+        disabled={isPending}
+        className="inline-flex w-fit items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        data-testid="apod-backfill-button"
+        aria-busy={isPending}
+      >
+        {isPending ? 'Backfilling…' : 'Backfill 30 days'}
+      </button>
+      {status.kind !== 'idle' && (
+        <p
+          role="status"
+          aria-live="polite"
+          data-testid="apod-backfill-status"
+          className={
+            status.kind === 'error'
+              ? 'text-sm text-red-600 dark:text-red-400'
+              : status.kind === 'success'
+                ? 'text-sm text-green-600 dark:text-green-400'
+                : 'text-sm text-gray-500 dark:text-gray-400'
+          }
+        >
+          {status.kind === 'pending'
+            ? 'Backfilling history…'
+            : status.kind === 'success'
+              ? status.message
+              : status.kind === 'error'
+                ? status.message
+                : ''}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function ApodArchive() {
@@ -90,24 +204,38 @@ export function ApodArchive() {
 
   if (total === 0) {
     return (
-      <EmptyState
-        variant="zero"
-        message="No APOD entries yet"
-        description="Once the scheduler fetches pictures, they'll appear here."
-      />
+      <div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            APOD Archive
+          </h1>
+        </div>
+        <EmptyState
+          variant="zero"
+          message="No APOD entries yet"
+          description="Backfill the last 30 days, or wait for the scheduler to fetch pictures."
+          action={<BackfillControl />}
+        />
+      </div>
     );
   }
 
   return (
     <div>
       <header className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          APOD Archive
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {total} {total === 1 ? 'entry' : 'entries'} · page {page} of{' '}
-          {totalPages}
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              APOD Archive
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {total} {total === 1 ? 'entry' : 'entries'} · page {page} of{' '}
+              {totalPages}
+            </p>
+          </div>
+          {/* VAL-PRODFIX-007: on-demand history backfill for authed users. */}
+          <BackfillControl />
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
