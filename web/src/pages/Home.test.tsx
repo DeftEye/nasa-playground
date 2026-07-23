@@ -35,6 +35,22 @@ const VIDEO_ENTRY: ApodEntry = {
   fetchedAt: '2025-07-22T16:00:00.000Z',
 };
 
+// A video APOD whose source host has no supported embed (e.g. a direct
+// `.mp4` file page). The backend leaves `videoUrl = null` and keeps `url`
+// pointing at the source video page (VAL-APOD-010). The UI must NOT render
+// an `<img>` whose src is that video-page url (broken image) — instead it
+// must render a "Watch video" link to `url` (VAL-FE-HOME-008).
+const VIDEO_NO_EMBED_ENTRY: ApodEntry = {
+  date: '2025-07-22',
+  title: 'Direct File Video',
+  explanation: 'A direct-file video with no embeddable player.',
+  url: 'https://example.com/videos/aurora.mp4',
+  mediaType: 'video',
+  videoUrl: null,
+  copyright: null,
+  fetchedAt: '2025-07-22T16:00:00.000Z',
+};
+
 const LONG_TITLE =
   'A Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Very Long APOD Title That Should Truncate With Ellipsis';
 
@@ -148,6 +164,45 @@ describe('Home — VAL-FE-HOME-002 video vs image', () => {
     const img = await screen.findByTestId('apod-image');
     expect(img.tagName).toBe('IMG');
     expect(img).toHaveAttribute('src', IMAGE_ENTRY.url);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VAL-FE-HOME-008: video with no embeddable videoUrl renders a "Watch video"
+// link to the source url (new tab), never a broken <img> with the video url.
+// ---------------------------------------------------------------------------
+
+describe('Home — VAL-FE-HOME-008 video with null videoUrl', () => {
+  it('renders a "Watch video" link to entry.url and no <img> with the video url', async () => {
+    server.use(todayHandler(VIDEO_NO_EMBED_ENTRY));
+
+    renderWithProviders(<HomeTree />, {
+      routerProps: { initialEntries: ['/'] },
+    });
+
+    // Wait for the hero to render.
+    await screen.findByTestId('apod-title');
+
+    // A visible "Watch video" affordance links to the source video url.
+    const watchLink = await screen.findByRole('link', { name: /watch video/i });
+    expect(watchLink).toBeVisible();
+    expect(watchLink).toHaveAttribute('href', VIDEO_NO_EMBED_ENTRY.url);
+    // Opens in a new tab without leaking a reference to the opener.
+    expect(watchLink).toHaveAttribute('target', '_blank');
+    expect(watchLink.getAttribute('rel')).toMatch(/noopener/);
+    expect(watchLink.getAttribute('rel')).toMatch(/noreferrer/);
+
+    // No <iframe> is rendered for a non-embeddable video.
+    expect(screen.queryByTestId('apod-video-iframe')).not.toBeInTheDocument();
+
+    // No <img> whose src is the video-page url exists (would be a broken
+    // image). The image testid must be absent, and no stray <img> points at
+    // the video url either.
+    expect(screen.queryByTestId('apod-image')).not.toBeInTheDocument();
+    const imgs = document.querySelectorAll('img');
+    imgs.forEach((img) => {
+      expect(img).not.toHaveAttribute('src', VIDEO_NO_EMBED_ENTRY.url);
+    });
   });
 });
 

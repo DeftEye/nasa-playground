@@ -51,13 +51,58 @@ function extractYouTubeId(rawUrl: string): string | null {
 }
 
 /**
+ * Parses a URL and returns the Vimeo video id when host is vimeo.com or
+ * player.vimeo.com, else null. Accepts the canonical forms:
+ * - `https://vimeo.com/<id>`
+ * - `https://www.vimeo.com/<id>`
+ * - `https://player.vimeo.com/video/<id>`
+ * Trailing path segments (e.g. `/12345/abc` privacy hashes) are ignored; only
+ * the first numeric segment is treated as the id.
+ */
+function extractVimeoId(rawUrl: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const isVimeo =
+    host === 'vimeo.com' ||
+    host === 'www.vimeo.com' ||
+    host === 'player.vimeo.com';
+  if (!isVimeo) {
+    return null;
+  }
+  if (host === 'player.vimeo.com') {
+    const match = parsed.pathname.match(/^\/video\/([^/?#]+)/);
+    return match ? match[1] : null;
+  }
+  // vimeo.com / www.vimeo.com -> first path segment is the numeric id.
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  const id = segments[0];
+  return id && /^\d+$/.test(id) ? id : null;
+}
+
+/**
  * For a video APOD whose `url` is a YouTube link, returns the embed form
- * `https://www.youtube.com/embed/<id>`. For any non-YouTube host (Vimeo, etc.)
- * returns `null` so the frontend falls back to the raw `url`.
+ * `https://www.youtube.com/embed/<id>`. For a Vimeo link (`vimeo.com/<id>` or
+ * `player.vimeo.com/video/<id>`) returns the embeddable player URL
+ * `https://player.vimeo.com/video/<id>`. For any other host (direct `.mp4`,
+ * unknown provider) returns `null` so the frontend falls back to a link to the
+ * source `url`. The caller is responsible for preserving the original `url`
+ * (this transform never blanks it).
  */
 export function toEmbedUrl(rawUrl: string): string | null {
-  const id = extractYouTubeId(rawUrl);
-  return id ? `https://www.youtube.com/embed/${id}` : null;
+  const ytId = extractYouTubeId(rawUrl);
+  if (ytId) {
+    return `https://www.youtube.com/embed/${ytId}`;
+  }
+  const vimeoId = extractVimeoId(rawUrl);
+  if (vimeoId) {
+    return `https://player.vimeo.com/video/${vimeoId}`;
+  }
+  return null;
 }
 
 /** Maps NASA's free-form `media_type` string to our enum. */

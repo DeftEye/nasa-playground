@@ -100,6 +100,35 @@ function videoListHandler() {
   });
 }
 
+// A video APOD whose source host has no supported embed (e.g. a direct
+// `.mp4` file page). Backend leaves `videoUrl = null` and keeps `url`
+// pointing at the source video page (VAL-APOD-010). The archive card must
+// NOT render an `<img>` whose src is the video-page url (broken image) —
+// instead it must render a "Watch video" link to `url`
+// (VAL-FE-ARCHIVE-006).
+function videoNoEmbedListHandler() {
+  const data = [
+    {
+      date: '2025-07-22',
+      title: 'Direct File Video',
+      explanation: 'A direct-file video with no embeddable player.',
+      url: 'https://example.com/videos/aurora.mp4',
+      mediaType: 'video',
+      videoUrl: null,
+      copyright: null,
+      fetchedAt: '2025-07-22T16:00:00.000Z',
+    },
+  ];
+  return http.get('/api/nasa/apod', ({ request }) => {
+    const url = new URL(request.url);
+    const page = Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1;
+    return HttpResponse.json(
+      { data, total: 1, page, limit: PAGE_SIZE },
+      { status: 200 },
+    );
+  });
+}
+
 function ArchiveTree() {
   return (
     <Routes>
@@ -266,6 +295,51 @@ describe('ApodArchive — VAL-FE-ARCHIVE-004 video iframe', () => {
     expect(
       within(card).queryByTestId('apod-archive-card-image'),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VAL-FE-ARCHIVE-006: video with null videoUrl renders a "Watch video" link,
+// never a broken <img> with the video-page url as src.
+// ---------------------------------------------------------------------------
+
+describe('ApodArchive — VAL-FE-ARCHIVE-006 video with null videoUrl', () => {
+  it('renders a "Watch video" link to entry.url and no <img> with the video url', async () => {
+    server.use(videoNoEmbedListHandler());
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    const card = await screen.findByTestId('apod-archive-card');
+
+    // A visible "Watch video" affordance links to the source video url.
+    const watchLink = within(card).getByRole('link', { name: /watch video/i });
+    expect(watchLink).toBeVisible();
+    expect(watchLink).toHaveAttribute('href', 'https://example.com/videos/aurora.mp4');
+    // Opens in a new tab without leaking a reference to the opener.
+    expect(watchLink).toHaveAttribute('target', '_blank');
+    expect(watchLink.getAttribute('rel')).toMatch(/noopener/);
+    expect(watchLink.getAttribute('rel')).toMatch(/noreferrer/);
+
+    // No <iframe> is rendered for a non-embeddable video.
+    expect(
+      within(card).queryByTestId('apod-archive-card-iframe'),
+    ).not.toBeInTheDocument();
+
+    // No <img> whose src is the video-page url exists on the card (would be
+    // a broken image). The image testid must be absent, and no stray <img>
+    // on the card points at the video url either.
+    expect(
+      within(card).queryByTestId('apod-archive-card-image'),
+    ).not.toBeInTheDocument();
+    const imgs = card.querySelectorAll('img');
+    imgs.forEach((img) => {
+      expect(img).not.toHaveAttribute(
+        'src',
+        'https://example.com/videos/aurora.mp4',
+      );
+    });
   });
 });
 
