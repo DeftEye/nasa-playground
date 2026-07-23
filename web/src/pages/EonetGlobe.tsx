@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchEonetMap } from '../api/eonet';
+import { fetchEonetMap, fetchEonetCategories } from '../api/eonet';
 import { fetchCountries } from '../lib/globe/countries';
 import { categoryColor, type CountryFeature } from '../lib/globe/geo';
 import { GlobeView } from '../components/globe/GlobeView';
@@ -9,28 +9,34 @@ import { webglAvailable } from '../components/globe/webgl';
 import { Skeleton } from '../components/Skeleton';
 import { ErrorState } from '../components/ErrorState';
 import { EmptyState } from '../components/EmptyState';
-import type { EonetMapEvent } from '../types';
+import type { EonetCategory, EonetMapEvent, EonetStatus } from '../types';
 
 /**
  * EonetGlobe — the `/globe` page shell (architecture §16.2 /
  * `library/eonet-globe.md`).
  *
- * M10 part 1 scope (this feature): scaffold + render. Fetches the map
- * endpoint with the default 30-day window, renders the react-globe.gl globe
- * (country polygons + event points colored by category with hover titles)
- * when WebGL is available, and ALWAYS renders the assertable DOM mirror
- * layer (`globe-event-point` per plotted event with `data-event-id` /
- * `data-category` / `data-status` / `data-title`, plus `globe-events-count`).
+ * Renders a top filter bar (`globe-filter-category` / `globe-filter-status` /
+ * `globe-filter-window`) wired to the react-query fetch of the map endpoint.
+ * The query key includes `days`/`category`/`status`; any filter change
+ * refetches the map endpoint and updates the plotted point set +
+ * `globe-events-count` (VAL-GLOBE-013..017). The window control MUST refetch
+ * because the server applies the date window (VAL-GLOBE-015). Combined
+ * filters are applied together as an intersection (VAL-GLOBE-016). Initial
+ * load uses the default 30-day window with no category/status filters
+ * (VAL-GLOBE-017).
+ *
+ * Dedicated cross-page UX states with stable testids:
+ * - `globe-skeleton` while the map query is fetching (VAL-GLOBE-018).
+ * - `globe-empty` when the window has zero events ("no events in this
+ *   window", distinct from error) (VAL-GLOBE-019).
+ * - `globe-error` + `globe-error-retry` on 5xx; retry re-runs the query
+ *   (VAL-GLOBE-020 / VAL-GLOBE-021).
  *
  * When WebGL is unavailable (synchronous guard) or the `GlobeErrorBoundary`
  * catches a render-phase WebGL failure, `globe-webgl-unavailable` is shown
- * AND the DOM mirror still renders — the page stays testable without WebGL
- * (VAL-GLOBE-022 / VAL-GLOBE-023).
- *
- * The filter bar (`globe-filter-*`), dedicated loading/empty/error testids
- * (`globe-skeleton`, `globe-empty`, `globe-error`), and country-click side
- * panel are owned by the `m10-globe-filter-bar` and M11 features and are
- * intentionally NOT implemented here.
+ * AND the filter bar + DOM mirror still render — the page stays testable
+ * and the filters remain functional without WebGL (VAL-GLOBE-022 /
+ * VAL-GLOBE-023 / VAL-GLOBE-024).
  *
  * The map endpoint is the ONLY data source for plotted points
  * (VAL-GLOBE-026); the legacy `/events` list endpoint is never called on
@@ -39,17 +45,58 @@ import type { EonetMapEvent } from '../types';
  */
 
 const DEFAULT_WINDOW_DAYS = 30;
+const WINDOW_OPTIONS: ReadonlyArray<7 | 14 | 30> = [7, 14, 30];
+
+type StatusFilter = EonetStatus | 'all';
+
+interface GlobeFilters {
+  days: 7 | 14 | 30;
+  category: string; // slug, or 'all'
+  status: StatusFilter;
+}
+
+/** Converts the UI filter state into map-endpoint query params. `'all'`
+ *  values are translated to `undefined` so the backend does not receive an
+ *  invalid `status=all` (the DTO only allows `open`/`closed`) and so the
+ *  initial request carries no category/status (VAL-GLOBE-017). */
+function mapParamsFromFilters(f: GlobeFilters) {
+  return {
+    days: f.days,
+    category: f.category !== 'all' ? f.category : undefined,
+    status: f.status !== 'all' ? f.status : undefined,
+  };
+}
 
 export function EonetGlobe() {
   // Synchronous WebGL probe — runs once on mount, before the first render
   // decides whether to mount the canvas (VAL-GLOBE-022).
   const webglOk = useMemo(() => webglAvailable(), []);
 
-  // The map endpoint is the sole data source for plotted points. Default
-  // 30-day window, no category/status filters (VAL-GLOBE-017 / VAL-GLOBE-026).
+  // Filter state. Initial load: 30-day window, no category/status filters
+  // (VAL-GLOBE-017).
+  const [filters, setFilters] = useState<GlobeFilters>({
+    days: DEFAULT_WINDOW_DAYS,
+    category: 'all',
+    status: 'all',
+  });
+
+  const mapParams = mapParamsFromFilters(filters);
+
+  // The map endpoint is the sole data source for plotted points. The query
+  // key includes days/category/status so any filter change refetches
+  // (VAL-GLOBE-013..017 / VAL-GLOBE-026).
   const mapQuery = useQuery({
-    queryKey: ['eonet', 'map', { days: DEFAULT_WINDOW_DAYS }],
-    queryFn: () => fetchEonetMap({ days: 30 }),
+    queryKey: ['eonet', 'map', { days: filters.days, category: filters.category, status: filters.status }],
+    queryFn: () => fetchEonetMap(mapParams),
+  });
+
+  // Categories populate the category <select> options (VAL-GLOBE-010).
+  // Fetched once, cached; the select still renders with just 'all' while
+  // pending.
+  const categoriesQuery = useQuery({
+    queryKey: ['eonet', 'categories'],
+    queryFn: fetchEonetCategories,
+    staleTime: 60_000,
   });
 
   // Countries are only needed to render the globe polygons; skip the fetch
@@ -66,6 +113,7 @@ export function EonetGlobe() {
 
   const events: EonetMapEvent[] = mapQuery.data?.events ?? [];
   const countries: CountryFeature[] = countriesQuery.data ?? [];
+  const categories: EonetCategory[] = categoriesQuery.data ?? [];
 
   return (
     <div data-testid="globe-page" className="space-y-4">
@@ -79,22 +127,35 @@ export function EonetGlobe() {
         </p>
       </header>
 
-      {/* Loading skeleton (shared component; the dedicated `globe-skeleton`
-          testid is added by the filter-bar feature). */}
+      {/* Filter bar — renders in every state (loading/empty/error/WebGL-down)
+          so filters remain interactive (VAL-GLOBE-024). */}
+      <GlobeFilterBar
+        filters={filters}
+        categories={categories}
+        onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+      />
+
+      {/* Loading skeleton (VAL-GLOBE-018). Dedicated `globe-skeleton` testid
+          in addition to the shared Skeleton. */}
       {mapQuery.isPending && (
-        <div className="rounded-lg border border-gray-200 p-6 dark:border-gray-700">
+        <div
+          data-testid="globe-skeleton"
+          className="rounded-lg border border-gray-200 p-6 dark:border-gray-700"
+        >
           <Skeleton rows={4} />
         </div>
       )}
 
-      {/* 5xx / network error with Retry (shared component; the dedicated
-          `globe-error` / `globe-error-retry` testids are added by the
-          filter-bar feature). */}
+      {/* 5xx / network error with Retry (VAL-GLOBE-020 / VAL-GLOBE-021).
+          Dedicated `globe-error` + `globe-error-retry` testids. */}
       {mapQuery.isError && (
-        <ErrorState
-          message="We couldn't load the EONET map. Please try again."
-          onRetry={() => mapQuery.refetch()}
-        />
+        <div data-testid="globe-error" role="alert">
+          <ErrorState
+            message="We couldn't load the EONET map. Please try again."
+            onRetry={() => mapQuery.refetch()}
+            retryTestId="globe-error-retry"
+          />
+        </div>
       )}
 
       {mapQuery.data && (
@@ -148,15 +209,17 @@ export function EonetGlobe() {
             </span>
           </div>
 
-          {/* Empty state when the window has no events (shared component;
-              the dedicated `globe-empty` testid is added by the filter-bar
-              feature). */}
+          {/* Empty state when the window has no events (VAL-GLOBE-019).
+              Distinct copy from the error state; dedicated `globe-empty`
+              testid. */}
           {events.length === 0 && (
-            <EmptyState
-              variant="zero"
-              message="No events in this window"
-              description="Try a wider time window (the filter bar is coming soon)."
-            />
+            <div data-testid="globe-empty">
+              <EmptyState
+                variant="zero"
+                message="No events in this window"
+                description="Try a wider time window or a different category/status filter."
+              />
+            </div>
           )}
 
           {/* DOM mirror: one `globe-event-point` per plotted event, carrying
@@ -201,6 +264,89 @@ export function EonetGlobe() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Filter bar
+// ---------------------------------------------------------------------------
+
+interface GlobeFilterBarProps {
+  filters: GlobeFilters;
+  categories: EonetCategory[];
+  onChange: (patch: Partial<GlobeFilters>) => void;
+}
+
+/**
+ * The top filter bar: category select, status select, and a segmented
+ * 7/14/30-day window control. Each control carries a stable testid and
+ * stable option values (VAL-GLOBE-010 / VAL-GLOBE-011 / VAL-GLOBE-012).
+ *
+ * The filter bar renders in every page state (loading, empty, error,
+ * WebGL-unavailable) so filtering stays functional without WebGL
+ * (VAL-GLOBE-024).
+ */
+function GlobeFilterBar({ filters, categories, onChange }: GlobeFilterBarProps) {
+  return (
+    <div
+      className="flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
+      data-testid="globe-filter-bar"
+    >
+      {/* Category select — 'all' + one option per category slug
+          (VAL-GLOBE-010). */}
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+        Category
+        <select
+          data-testid="globe-filter-category"
+          value={filters.category}
+          onChange={(e) => onChange({ category: e.target.value })}
+          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+        >
+          <option value="all">All categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.title}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {/* Status select — all/open/closed, default 'all' (VAL-GLOBE-011). */}
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+        Status
+        <select
+          data-testid="globe-filter-status"
+          value={filters.status}
+          onChange={(e) => onChange({ status: e.target.value as StatusFilter })}
+          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+        >
+          <option value="all">All</option>
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
+        </select>
+      </label>
+
+      {/* Window segmented control — 7/14/30, default 30 (VAL-GLOBE-012).
+          Rendered as a <select> so it carries stable option values and is
+          drivable via native events in agent-browser eval. */}
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+        Time window (days)
+        <select
+          data-testid="globe-filter-window"
+          value={String(filters.days)}
+          onChange={(e) =>
+            onChange({ days: Number(e.target.value) as 7 | 14 | 30 })
+          }
+          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+        >
+          {WINDOW_OPTIONS.map((d) => (
+            <option key={d} value={String(d)}>
+              {d}
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 }
