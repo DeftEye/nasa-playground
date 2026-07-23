@@ -1,0 +1,86 @@
+# NASA Sky Tracker — production compose stack (VAL-DOCKER-003/004/005).
+#
+# Brings up the containerized app (built from the repo-root Dockerfile) plus a
+# Postgres 17 instance. The app runs migrations on startup (NODE_ENV=production,
+# synchronize off) and serves the API at /api/* and the built SPA at / from a
+# single Node process on host port 3000.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   curl http://localhost:3000/api/nasa/health     # -> 200 {"status":"ok","db":"up",...}
+#   curl http://localhost:3000/                    # -> SPA index.html
+#   docker compose -f docker-compose.prod.yml down -v
+#
+# Do NOT run concurrently with the dev `api` service (services.yaml) — both
+# map host port 3000.
+
+# Distinct project name so this prod stack is isolated from the dev
+# `docker-compose.yml` stack (project `nest-playground`). Without this, the
+# two compose files would share the `nest-playground` project and collide on
+# the `db` service container / volume. With `name:` set, the bare contract
+# commands (`docker compose -f docker-compose.prod.yml up -d` / `down -v`)
+# operate on this project only and never touch the dev DB.
+name: nasa-sky-tracker-prod
+
+services:
+  db:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pass123
+      POSTGRES_DB: nasa_sky_tracker
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d nasa_sky_tracker']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Intentionally no `ports:` mapping — the DB is internal to the compose
+    # network only (avoids a conflict with the dev `db` service on host 5432).
+
+  app:
+    build: .
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      # Postgres wired to the `db` service via the compose network.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pass123
+      POSTGRES_DB: nasa_sky_tracker
+      # Required in production by env validation (VAL-ENV-001). Override with
+      # a real secret for actual deployments; this non-secret value is for
+      # local prod-parity smoke testing only.
+      JWT_SECRET: change-me-in-prod
+      JWT_EXPIRES_IN: 7d
+      AUTH_REQUIRED: 'true'
+      NASA_API_KEY: DEMO_KEY
+      DISABLE_NOTIFICATION_MOCK: 'false'
+      # Skip live NASA calls on boot during prod smoke tests; schedulers still
+      # arm and can fire later. Override to `true` for a real deployment.
+      APOD_BOOT_CATCHUP: 'false'
+      EONET_BOOT_CATCHUP: 'false'
+      PORT: '3000'
+    ports:
+      - '3000:3000'
+    healthcheck:
+      # Node 24 has global `fetch`. Hit the API health endpoint; a 200 means
+      # migrations ran, the DB is connected, and the HTTP server is listening.
+      test:
+        - 'CMD'
+        - 'node'
+        - '-e'
+        - "fetch('http://localhost:3000/api/nasa/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  pgdata:

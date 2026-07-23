@@ -1,0 +1,48 @@
+# Build context minimization for the NASA Sky Tracker production image.
+# Keeps secrets and bulky/local-only artifacts out of the context sent to the
+# Docker daemon (VAL-DOCKER-002).
+
+# --- Dependencies (installed inside the image via `npm ci`) ---
+node_modules
+web/node_modules
+
+# --- Local build outputs (rebuilt inside the image) ---
+dist
+web/dist
+build
+coverage
+.nyc_output
+
+# --- VCS / metadata ---
+.git
+.gitignore
+.gitattributes
+
+# --- Secrets (NEVER bake into an image) ---
+.env
+.env.*
+!.env.example
+
+# --- Logs / scratch / mission artifacts ---
+*.log
+*.bru
+snowflake.log
+.init-deps-snapshot.txt
+.tmp
+.temp
+
+# --- IDE / OS ---
+.idea
+.vscode
+.DS_Store
+
+# --- Docker / compose themselves (not needed inside the image) ---
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.prod.yml
+
+# --- Docs / tests not needed at runtime ---
+README.md
+TESTING.md
+test
