@@ -60,7 +60,12 @@ function maybeServeStatic(): DynamicModule[] {
       password: process.env.POSTGRES_PASSWORD ?? 'pass123',
       database: process.env.POSTGRES_DB ?? 'nasa_sky_tracker',
       autoLoadEntities: true,
-      synchronize: true,
+      // Schema is versioned via TypeORM migrations in production (see
+      // `src/data-source.ts` + `src/migrations`). Dev/test keep
+      // `synchronize: true` so the existing Jest suite, which boots the full
+      // AppModule against the test DB without running migrations, still gets
+      // its tables auto-created (architecture §15 / VAL-MIG-002).
+      synchronize: process.env.NODE_ENV !== 'production',
     }),
   ],
   controllers: [AppController],
