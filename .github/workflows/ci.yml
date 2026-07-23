@@ -136,3 +136,42 @@ jobs:
 
       - name: Docker build
         run: docker build -t nasa-sky-tracker:ci .
+
+  # Continuous deployment: CI-gated (needs ci), push-to-master-only. Triggers
+  # the Render deploy hook, then verifies the live /api/nasa/health endpoint
+  # returns 200 before the job is considered green. Never runs on pull_request.
+  deploy:
+    name: Deploy to Render
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      # POST to the Render deploy hook. The URL is a repository secret and is
+      # passed via env (never inlined). `-f` makes curl fail on non-2xx.
+      - name: Trigger Render deploy
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+
+      # Known limitation: with only a deploy hook (no Render API key/service
+      # ID) we can confirm the service is healthy after the deploy, but cannot
+      # strictly assert the newly-pushed commit is the version now live. The
+      # initial 45s sleep lets Render begin replacing the old instance so we
+      # don't just read a 200 from the still-running previous version.
+      - name: Wait for deploy to go live
+        run: |
+          echo "Waiting 45s for Render to start replacing the old instance..."
+          sleep 45
+          url="https://nasa-playground.onrender.com/api/nasa/health"
+          for attempt in $(seq 1 40); do
+            code=$(curl -fsS -o /dev/null -w "%{http_code}" "$url" || true)
+            echo "Attempt ${attempt}/40: HTTP ${code}"
+            if [ "$code" = "200" ]; then
+              echo "Deploy is live and healthy."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health endpoint did not return 200 within the budget."
+          exit 1
