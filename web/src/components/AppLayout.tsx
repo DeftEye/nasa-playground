@@ -36,6 +36,12 @@ export function AppLayout() {
               EONET
             </Link>
             <Link
+              to="/globe"
+              className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+            >
+              Globe
+            </Link>
+            <Link
               to="/notifications"
               className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
             >

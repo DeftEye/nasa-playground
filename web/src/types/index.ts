@@ -105,6 +105,42 @@ export interface EonetEventListParams {
 }
 
 // ---------------------------------------------------------------------------
+// EONET map endpoint (`GET /api/nasa/eonet/events/map` — M9/M10)
+// ---------------------------------------------------------------------------
+
+/** One category entry returned per event in the map payload. */
+export interface EonetMapCategory {
+  id: string; // slug, e.g. "wildfires"
+  title: string;
+}
+
+/** A single map-ready event with normalized `{lat, lng}` and joined
+ *  categories (architecture §16.1). */
+export interface EonetMapEvent {
+  id: string;
+  title: string;
+  status: EonetStatus;
+  date: string; // ISO-8601 (most-recent geometry observation date or firstSeenAt)
+  lat: number;
+  lng: number;
+  link: string;
+  categories: EonetMapCategory[];
+}
+
+/** Envelope returned by `GET /api/nasa/eonet/events/map`. Bare object — NOT
+ *  the paginated list envelope. */
+export interface EonetMapResponse {
+  window: { days: number; from: string; to: string };
+  events: EonetMapEvent[];
+}
+
+export interface EonetMapParams {
+  days?: 7 | 14 | 30;
+  category?: string;
+  status?: EonetStatus;
+}
+
+// ---------------------------------------------------------------------------
 // Subscribers (src/subscribers/)
 // ---------------------------------------------------------------------------
 
