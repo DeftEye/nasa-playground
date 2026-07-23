@@ -54,13 +54,14 @@ This runs NestJS (port 3000) and Vite (port 5173) concurrently via `concurrently
 ### 5. Production mode
 
 ```bash
-npm run build         # builds backend (nest build) — run `cd web && npm run build` first for FE
-cd web && npm run build  # builds frontend to web/dist/
+cd web && npm run build    # builds frontend to web/dist/
 cd ..
-npm run start:prod    # node dist/main — serves both API and FE on port 3000
+npm run build              # builds backend (nest build)
+npm run migration:run      # apply migrations (or npm run migration:run:prod from compiled dist/)
+npm run start:prod         # node dist/main — serves both API and FE on port 3000
 ```
 
-In production, `@nestjs/serve-static` mounts `web/dist` so the built frontend is served at `/` and the API at `/api/*` from a single Node process on port 3000. No CORS headers are emitted (same-origin).
+In production, `synchronize` is disabled and the schema must be applied via migrations. On a fresh database, `npm run start:prod` will fail to boot if migrations have not run. `@nestjs/serve-static` mounts `web/dist` so the built frontend is served at `/` and the API at `/api/*` from a single Node process on port 3000. No CORS headers are emitted (same-origin).
 
 ## Environment Variables
 
@@ -68,19 +69,18 @@ See `.env.example` for a template. All keys with defaults are optional.
 
 | Name | Required | Default | Purpose |
 |------|----------|---------|---------|
+| `NODE_ENV` | no | `development` | `production` disables auto-sync and enforces fail-fast env validation |
 | `POSTGRES_HOST` | yes | `localhost` | Postgres host |
 | `POSTGRES_PORT` | yes | `5432` | Postgres port |
 | `POSTGRES_USER` | yes | `postgres` | Postgres user |
 | `POSTGRES_PASSWORD` | yes | `pass123` | Postgres password |
 | `POSTGRES_DB` | yes | `nasa_sky_tracker` | Postgres database |
-| `DATABASE_URL` | no | derived from `POSTGRES_*` | Full Postgres URL |
 | `NASA_API_KEY` | no | `DEMO_KEY` | NASA API key (falls back to DEMO_KEY) |
-| `JWT_SECRET` | yes (prod) | random dev fallback | JWT signing secret |
+| `JWT_SECRET` | yes (prod) | random dev fallback | JWT signing secret; production startup validation refuses to boot if missing/invalid |
 | `JWT_EXPIRES_IN` | no | `7d` | Token TTL |
 | `APOD_CRON` | no | `0 16 * * *` | APOD cron expression (UTC) |
 | `EONET_POLL_MINUTES` | no | `15` | EONET poll interval in minutes |
 | `EONET_CLOSED_WINDOW_DAYS` | no | `30` | Bounded lookback for closed EONET events |
-| `DISCORD_DEFAULT_WEBHOOK_URL` | no | unset | Optional fallback webhook |
 | `DISABLE_NOTIFICATION_MOCK` | no | `false` | `true` = real Discord POSTs |
 | `AUTH_REQUIRED` | no | `true` | `false` = public NASA reads |
 | `PORT` | no | `3000` | NestJS listen port |
@@ -181,6 +181,40 @@ cd web && npm run lint                      # frontend
 
 Backend integration tests use a separate database `nasa_sky_tracker_test`. It is created automatically by `init.sh` or `services.yaml`'s `test_db` service. Jest runs with `maxWorkers: 1` (serial) because the test DB is shared across suites.
 
+## Database Migrations
+
+TypeORM schema synchronization is environment-conditional: `synchronize: true` in development and test, and `synchronize: false` in production (`NODE_ENV=production`). In production, the database schema must be applied via committed migrations, not auto-sync.
+
+A standalone `src/data-source.ts` TypeORM DataSource (with `synchronize: false`) drives the CLI. The initial migration is `src/migrations/1784792437520-InitialSchema.ts`; it begins with `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"` and then creates all 8 tables with foreign keys, `ON DELETE CASCADE`, and indexes.
+
+Available npm scripts:
+
+```bash
+npm run migration:generate -- src/migrations/NameOfMigration  # generate a new migration from entity changes (dev only)
+npm run migration:run                                         # apply pending migrations against src/data-source.ts (dev/test)
+npm run migration:revert                                      # roll back the last applied migration (dev/test)
+npm run migration:run:prod                                    # run the compiled migration runner, node dist/migration-runner.js (no ts-node)
+```
+
+Generating a new migration after changing an entity:
+
+1. Make the entity change in `src/`.
+2. Ensure the dev database is running and up to date.
+3. Run `npm run migration:generate -- src/migrations/ShortDescription`.
+4. Review the generated file and commit it.
+
+Production flow (local or container):
+
+```bash
+cd web && npm run build    # build frontend to web/dist/
+cd ..
+npm run build              # build backend to dist/
+npm run migration:run:prod # apply compiled migrations (no ts-node)
+npm run start:prod         # start the server
+```
+
+Inside the Docker container, migrations run automatically via `docker-entrypoint.sh` before the main process starts.
+
 ## Continuous Integration
 
 GitHub Actions workflow at `.github/workflows/ci.yml` runs on every `push` and `pull_request` to `master`. The single `ci` job mirrors the local commands in `services.yaml`:
@@ -203,6 +237,38 @@ gh run list                       # recent runs
 gh run view <run-id>              # step-by-step status
 gh run watch <run-id> --exit-status   # block until conclusion
 ```
+
+## Deployment (Docker)
+
+The repository ships a multi-stage `Dockerfile` based on `node:24-slim` and a `docker-compose.prod.yml` stack (top-level project name: `nasa-sky-tracker-prod`). The build stage compiles the backend (`dist/`) and frontend (`web/dist/`), rebuilds `bcrypt` against the slim runtime, and the final image ships production-only `node_modules` plus the compiled artifacts and `docker-entrypoint.sh`.
+
+On startup the container runs `node dist/migration-runner.js` and then `node dist/main`, so migrations are applied automatically before the server binds port 3000. The same process serves the API at `/api/*` and the built SPA at `/`.
+
+Build and run the production stack locally:
+
+```bash
+# Option A: build the image directly
+docker build -t nasa-sky-tracker:latest .
+
+# Option B: recommended — build and start the full compose stack
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Set secrets via environment variables or a compose env file (for example, create a `.env.prod` and pass `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build`). **Never commit real secrets to the repository.** The compose file sets non-secret defaults for `JWT_SECRET` and `NASA_API_KEY` that are only suitable for local smoke testing; override them for real deployments.
+
+Verify the stack is healthy:
+
+```bash
+curl http://localhost:3000/api/nasa/health
+```
+
+Tear down the stack and remove the named volume:
+
+```bash
+docker compose -f docker-compose.prod.yml down -v
+```
+
+> **Port conflict warning:** The production `app` service binds host port `3000`. Do not run it at the same time as the local dev `api` service (or `npm run dev` / `npm run start:prod` on the host), or the ports will collide.
 
 ## Project Structure
 
@@ -231,6 +297,10 @@ gh run watch <run-id> --exit-status   # block until conclusion
 
 ## Notes
 
+- **Production env validation**: on startup, the app validates required environment variables. In `NODE_ENV=production`, a missing or invalid required variable (for example `JWT_SECRET`) is logged by name and the process exits non-zero before binding the port.
+- **Security headers**: `helmet` is applied globally in all environments.
+- **Graceful shutdown**: NestJS `enableShutdownHooks()` plus a `SIGTERM` handler close the database connection and exit with code `0`.
+- **Node version**: Node 24 is pinned via `.nvmrc` and `package.json` `engines`.
 - **Login rate-limiting**: not implemented in v1; documented as a known gap.
 - **EONET closed-window**: closed events are only fetched within `EONET_CLOSED_WINDOW_DAYS` (default 30) to avoid unbounded fetches.
 - **Webhook URL privacy**: raw Discord webhook URLs exist only in `subscribers.discord_webhook_url`; all API responses and notification log payloads use the redacted form `/webhooks/.../<last-4>`.
