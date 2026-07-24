@@ -68,7 +68,7 @@ function backfillErrorMessage(reason: unknown): string {
  * The APOD backfill now returns a partial-success summary
  * `{ requestedDays, saved, failed }` (VAL-PRODFIX2-004) instead of a bare
  * array, so a single unavailable date no longer aborts the loop. The status
- * text reflects three APOD-side outcomes:
+ * text reflects four APOD-side outcomes:
  * - all-saved   → "APOD history refreshed (N entries)"
  * - partial     → "Saved N of M, K failed" (VAL-PRODFIX2-005)
  * - all-failed  → "APOD backfill failed: all M date(s) failed"

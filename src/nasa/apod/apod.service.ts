@@ -273,7 +273,7 @@ export class ApodService {
         const response = await this.nasaClient.getApod(d);
         saved.push(this.transform(response, d));
       } catch (err) {
-        const reason = (err as Error).message ?? 'unknown error';
+        const reason = (err as Error).message || 'unknown error';
         this.logger.warn(
           `APOD backfill: failed to fetch ${d}: ${reason}; continuing.`,
         );
