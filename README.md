@@ -91,6 +91,7 @@ See `.env.example` for a template. All keys with defaults are optional.
 
 - **Cron**: `APOD_CRON` (default `0 16 * * *` UTC = 4 PM UTC daily)
 - **On-boot catch-up**: if today's APOD row is missing, fetches it. If the DB is empty, backfills the last 30 days.
+- **Manual backfill (already-populated DBs)**: the automatic 30-day backfill only runs on an empty table at boot, so for production databases that are already running with existing history, use the JWT-guarded `POST /api/nasa/triggers/backfill-apod` and `POST /api/nasa/triggers/backfill-eonet` endpoints (the APOD Archive page also exposes a "Backfill 30 days" button that calls these).
 - **Retry**: 3 total attempts (1 initial + 2 retries) with exponential backoff (1s, 3s). A 9s slot is reserved for a potential future 4th attempt.
 - **DEMO_KEY fallback**: if `NASA_API_KEY` is unset, uses `DEMO_KEY` with a warning log.
 - **Timeout**: 15s per NASA APOD request.
@@ -147,6 +148,8 @@ Subscribers are Discord notification targets owned by a user. Each subscriber ha
 | `GET` | `/api/nasa/eonet/events` | EONET events (filtered) |
 | `GET` | `/api/nasa/eonet/events/map` | Map-ready EONET events (one normalized `{lat, lng}` per event; rolling 7/14/30-day window; optional `category`/`status` filters) for the globe view |
 | `POST` | `/api/nasa/triggers/fetch-eonet` | Manual EONET fetch |
+| `POST` | `/api/nasa/triggers/backfill-apod?days=30` | Backfill up to `days` (int 1–30, default 30) days of APOD entries; idempotent; returns 200; 400 on invalid `days` |
+| `POST` | `/api/nasa/triggers/backfill-eonet` | Re-ingest the recent EONET window (open + closed-within-window) idempotently; returns 200 with a `{detected, updated, skipped, unchanged}` diff summary |
 | `GET` | `/api/nasa/health` | Health check (DB + NASA reachability) |
 
 ### Multi-User Isolation
@@ -303,6 +306,7 @@ docker compose -f docker-compose.prod.yml down -v
 
 - **Production env validation**: on startup, the app validates required environment variables. In `NODE_ENV=production`, a missing or invalid required variable (for example `JWT_SECRET`) is logged by name and the process exits non-zero before binding the port.
 - **Security headers**: `helmet` is applied globally in all environments.
+- **Content-Security-Policy**: the helmet CSP allows external APOD images (`apod.nasa.gov`) and YouTube/Vimeo video embeds so the archive/media pages render correctly; other helmet protections remain in effect.
 - **Graceful shutdown**: NestJS `enableShutdownHooks()` plus a `SIGTERM` handler close the database connection and exit with code `0`.
 - **Node version**: Node 24 is pinned via `.nvmrc` and `package.json` `engines`.
 - **Login rate-limiting**: not implemented in v1; documented as a known gap.

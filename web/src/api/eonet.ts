@@ -3,6 +3,7 @@ import type {
   EonetCategory,
   EonetEventListParams,
   EonetEventListResponse,
+  EonetFetchResult,
   EonetMapParams,
   EonetMapResponse,
 } from '../types';
@@ -72,6 +73,19 @@ export async function fetchEonetMap(
         status: params.status,
       },
     },
+  );
+  return data;
+}
+
+/**
+ * Backfill the recent EONET event window (open + closed-within-window) via
+ * the JWT-guarded `POST /api/nasa/triggers/backfill-eonet` endpoint
+ * (VAL-PRODFIX-005 / VAL-PRODFIX-007). Idempotent: re-running does not
+ * duplicate events. Returns the same diff summary as `fetch-eonet`.
+ */
+export async function triggerEonetBackfill(): Promise<EonetFetchResult> {
+  const { data } = await apiClient.post<EonetFetchResult>(
+    '/nasa/triggers/backfill-eonet',
   );
   return data;
 }
