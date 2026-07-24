@@ -122,6 +122,28 @@ export function dateNDaysAgo(
   return d.toISOString().slice(0, 10);
 }
 
+/** A single date that could not be fetched during a backfill run. */
+export interface ApodBackfillFailure {
+  /** The `YYYY-MM-DD` date that failed. */
+  date: string;
+  /** Human-readable reason (NASA error message, timeout, etc.). */
+  reason: string;
+}
+
+/**
+ * Partial-success summary returned by {@link ApodService.backfill}. Replaces
+ * the previous bare `ApodEntry[]` so a single unavailable date no longer
+ * aborts the whole loop or surfaces a 500 (VAL-PRODFIX2-004).
+ */
+export interface ApodBackfillResult {
+  /** The number of consecutive days requested (1..30). */
+  requestedDays: number;
+  /** Entries that were fetched and persisted (upserted by date). */
+  saved: ApodEntry[];
+  /** Dates that could not be fetched, each with a reason. */
+  failed: ApodBackfillFailure[];
+}
+
 @Injectable()
 export class ApodService {
   private readonly logger = new Logger(ApodService.name);
@@ -224,18 +246,46 @@ export class ApodService {
   /**
    * Backfills the last `days` consecutive dates ending today. Idempotent: a
    * re-run upserts each date (no new rows) and refreshes `fetchedAt`.
+   *
+   * Per-date fault-tolerant (VAL-PRODFIX2-004): each individual
+   * `nasaClient.getApod(d)` + {@link transform} is wrapped in try/catch so a
+   * single unavailable date (e.g. today's APOD not yet published -> NASA 404,
+   * or a transient error) no longer aborts the whole loop or surfaces a raw
+   * 500. Dates that succeed are persisted via `repo.save`; dates that fail are
+   * reported in the `failed` array with a reason. Returns a partial-success
+   * summary object instead of a bare `ApodEntry[]`.
+   *
+   * When `failFast` is `true`, the method rethrows on the FIRST per-date
+   * failure (without persisting anything) so the caller (the on-boot
+   * catch-up's `runWithRetry`) can re-attempt the whole loop with 1s/3s/9s
+   * backoff per architecture §12 / VAL-SCHED-009. The manual trigger endpoint
+   * uses the default (`failFast = false`) partial-success path.
    */
-  async backfill(days = 30): Promise<ApodEntry[]> {
+  async backfill(days = 30, failFast = false): Promise<ApodBackfillResult> {
     const dates: string[] = [];
     for (let i = days - 1; i >= 0; i -= 1) {
       dates.push(dateNDaysAgo(i));
     }
-    const entries: ApodEntry[] = [];
+    const saved: ApodEntry[] = [];
+    const failed: ApodBackfillFailure[] = [];
     for (const d of dates) {
-      const response = await this.nasaClient.getApod(d);
-      entries.push(this.transform(response, d));
+      try {
+        const response = await this.nasaClient.getApod(d);
+        saved.push(this.transform(response, d));
+      } catch (err) {
+        const reason = (err as Error).message ?? 'unknown error';
+        this.logger.warn(
+          `APOD backfill: failed to fetch ${d}: ${reason}; continuing.`,
+        );
+        failed.push({ date: d, reason });
+        if (failFast) {
+          // Rethrow so the boot catch-up's runWithRetry re-attempts the loop.
+          throw err;
+        }
+      }
     }
-    return this.repo.save(entries);
+    const persisted = saved.length > 0 ? await this.repo.save(saved) : saved;
+    return { requestedDays: days, saved: persisted, failed };
   }
 
   /**

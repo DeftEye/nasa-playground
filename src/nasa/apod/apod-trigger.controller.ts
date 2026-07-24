@@ -6,8 +6,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApodEntry } from './entities/apod-entry.entity';
-import { ApodService, isIsoDate } from './apod.service';
+import { ApodService, ApodBackfillResult, isIsoDate } from './apod.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 
 /** Minimum / default backfill window size in days. */
@@ -64,14 +63,20 @@ export class ApodTriggerController {
   /**
    * Backfills the last `days` (default 30, max 30) consecutive dated APOD
    * rows. Idempotent: a re-run upserts each date (no duplicate rows), only
-   * refreshing `fetched_at`. Safe on a NON-empty table. The endpoint mirrors
-   * the existing `fetch-apod` guard + 200 status code (VAL-PRODFIX-004 /
-   * VAL-PRODFIX-006).
+   * refreshing `fetched_at`. Safe on a NON-empty table. Per-date
+   * fault-tolerant (VAL-PRODFIX2-004): a single unavailable date (e.g. today's
+   * APOD not yet published, or a transient NASA error) is captured in the
+   * `failed` array and does NOT abort the loop or produce a 500. Returns a
+   * partial-success summary `{ requestedDays, saved, failed }` (was a bare
+   * `ApodEntry[]`). The endpoint mirrors the existing `fetch-apod` guard +
+   * 200 status code (VAL-PRODFIX-004 / VAL-PRODFIX-006).
    */
   @Post('backfill-apod')
   @UseGuards(JwtAuthGuard)
   @HttpCode(200)
-  async backfillApod(@Query('days') days?: string): Promise<ApodEntry[]> {
+  async backfillApod(
+    @Query('days') days?: string,
+  ): Promise<ApodBackfillResult> {
     const parsed = parseBackfillDays(days);
     return this.apodService.backfill(parsed);
   }
