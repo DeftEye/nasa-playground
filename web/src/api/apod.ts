@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 import type {
   ApodEntry,
+  ApodBackfillResult,
   ApodListParams,
   ApodListResponse,
 } from '../types';
@@ -53,14 +54,20 @@ export async function triggerApodFetch(
 /**
  * Backfill the last `days` (default 30, max 30) consecutive dated APOD rows
  * via the JWT-guarded `POST /api/nasa/triggers/backfill-apod?days=` endpoint
- * (VAL-PRODFIX-004 / VAL-PRODFIX-007). Idempotent: a re-run upserts each
- * date (no duplicates), only refreshing `fetched_at`. Returns the upserted
- * entries.
+ * (VAL-PRODFIX-004 / VAL-PRODFIX-007 / VAL-PRODFIX2-004). Idempotent: a
+ * re-run upserts each date (no duplicates), only refreshing `fetched_at`.
+ *
+ * Returns the partial-success summary `{ requestedDays, saved, failed }`
+ * (VAL-PRODFIX2-005): every date that succeeds is in `saved`, each failure
+ * is reported in `failed` with a reason. A single unavailable date no
+ * longer aborts the loop or surfaces a 500 — the UI reads `saved`/`failed`
+ * counts to surface a partial message and refetch the archive whenever
+ * `saved.length > 0`.
  */
 export async function triggerApodBackfill(
   days: number = 30,
-): Promise<ApodEntry[]> {
-  const { data } = await apiClient.post<ApodEntry[]>(
+): Promise<ApodBackfillResult> {
+  const { data } = await apiClient.post<ApodBackfillResult>(
     '/nasa/triggers/backfill-apod',
     undefined,
     { params: { days } },

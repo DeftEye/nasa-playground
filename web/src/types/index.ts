@@ -65,6 +65,36 @@ export interface ApodListParams {
 }
 
 // ---------------------------------------------------------------------------
+// APOD backfill partial-success summary (VAL-PRODFIX2-004 / VAL-PRODFIX2-005)
+// ---------------------------------------------------------------------------
+
+/**
+ * One date that could not be backfilled, with a human-readable reason
+ * (NASA error message, timeout, etc.). Mirrors backend
+ * `ApodBackfillFailure`.
+ */
+export interface ApodBackfillFailure {
+  date: string; // YYYY-MM-DD
+  reason: string;
+}
+
+/**
+ * Partial-success summary returned by
+ * `POST /api/nasa/triggers/backfill-apod?days=` (replaces the previous bare
+ * `ApodEntry[]`). A single unavailable date no longer aborts the loop or
+ * surfaces a 500: every date that succeeds is in `saved`, each failure is
+ * reported in `failed`. Mirrors backend `ApodBackfillResult`.
+ */
+export interface ApodBackfillResult {
+  /** The number of consecutive days requested (1..30). */
+  requestedDays: number;
+  /** Entries that were fetched and persisted (upserted by date). */
+  saved: ApodEntry[];
+  /** Dates that could not be fetched, each with a reason. */
+  failed: ApodBackfillFailure[];
+}
+
+// ---------------------------------------------------------------------------
 // EONET (src/nasa/eonet/)
 // ---------------------------------------------------------------------------
 

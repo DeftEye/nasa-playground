@@ -6,7 +6,7 @@ import { triggerEonetBackfill } from '../api/eonet';
 import { Skeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorState } from '../components/ErrorState';
-import type { ApodEntry } from '../types';
+import type { ApodBackfillResult, ApodEntry } from '../types';
 
 /**
  * APOD Archive — paginated grid of date+title cards
@@ -63,17 +63,69 @@ function backfillErrorMessage(reason: unknown): string {
 }
 
 /**
- * "Backfill 30 days" control (VAL-PRODFIX-007). An authenticated user can
- * populate APOD (+ EONET) history on demand by clicking the button, which
- * POSTs to the JWT-guarded backfill trigger endpoints via the authed axios
- * client (`apiClient`, baseURL `/api`):
+ * Builds the APOD-side status text from the settled APOD backfill result.
+ *
+ * The APOD backfill now returns a partial-success summary
+ * `{ requestedDays, saved, failed }` (VAL-PRODFIX2-004) instead of a bare
+ * array, so a single unavailable date no longer aborts the loop. The status
+ * text reflects three APOD-side outcomes:
+ * - all-saved   → "APOD history refreshed (N entries)"
+ * - partial     → "Saved N of M, K failed" (VAL-PRODFIX2-005)
+ * - all-failed  → "APOD backfill failed: all M date(s) failed"
+ * - rejected    → "APOD backfill failed: <reason>" (HTTP-level failure)
+ */
+function apodStatusText(
+  fulfilled: boolean,
+  summary: ApodBackfillResult | null,
+  rejection: unknown | null,
+): string {
+  if (!fulfilled || summary === null) {
+    const reason = backfillErrorMessage(rejection);
+    return reason ? `APOD backfill failed: ${reason}` : 'APOD backfill failed';
+  }
+  const { requestedDays, saved, failed } = summary;
+  if (saved.length > 0 && failed.length === 0) {
+    return `APOD history refreshed (${saved.length} entries)`;
+  }
+  if (saved.length > 0 && failed.length > 0) {
+    return `Saved ${saved.length} of ${requestedDays}, ${failed.length} failed`;
+  }
+  // saved empty (every date failed but the HTTP request itself succeeded).
+  return `APOD backfill failed: all ${requestedDays} date(s) failed`;
+}
+
+/**
+ * Builds the EONET-side status text. Returns `null` when EONET succeeded AND
+ * APOD also succeeded (the clean case — no need to mention EONET). When APOD
+ * failed but EONET succeeded, surfaces "EONET backfill refreshed" so the
+ * mixed status conveys both halves (misc-m12-polish).
+ */
+function eonetStatusText(
+  eonetFulfilled: boolean,
+  apodFulfilled: boolean,
+  rejection: unknown | null,
+): string | null {
+  if (eonetFulfilled) {
+    return apodFulfilled ? null : 'EONET backfill refreshed';
+  }
+  const reason = backfillErrorMessage(rejection);
+  return reason ? `EONET backfill failed: ${reason}` : 'EONET backfill failed';
+}
+
+/**
+ * "Backfill 30 days" control (VAL-PRODFIX-007 / VAL-PRODFIX2-005). An
+ * authenticated user can populate APOD (+ EONET) history on demand by
+ * clicking the button, which POSTs to the JWT-guarded backfill trigger
+ * endpoints via the authed axios client (`apiClient`, baseURL `/api`):
  * - `POST /api/nasa/triggers/backfill-apod?days=30`
  * - `POST /api/nasa/triggers/backfill-eonet`
  *
  * While in-flight the button is disabled (pending state). A status message
- * (`apod-backfill-status`) reflects success/error. On success the APOD
+ * (`apod-backfill-status`) reflects success/error/partial outcome. Whenever
+ * the APOD backfill saved at least one entry (`saved.length > 0`) the APOD
  * archive react-query cache is invalidated so the list refetches and shows
- * the newly backfilled entries.
+ * the newly backfilled entries — even when some individual dates failed
+ * (VAL-PRODFIX2-005) or the EONET backfill failed (misc-m12-polish).
  */
 function BackfillControl() {
   const queryClient = useQueryClient();
@@ -92,68 +144,76 @@ function BackfillControl() {
         triggerEonetBackfill(),
       ]);
 
-      const apodOk = apodResult.status === 'fulfilled';
-      const eonetOk = eonetResult.status === 'fulfilled';
+      const apodFulfilled = apodResult.status === 'fulfilled';
+      const eonetFulfilled = eonetResult.status === 'fulfilled';
+      const apodSummary =
+        apodFulfilled
+          ? (apodResult as PromiseFulfilledResult<ApodBackfillResult>).value
+          : null;
+      const apodRejection = rejectReason(apodResult);
+      const eonetRejection = rejectReason(eonetResult);
+      const savedCount = apodSummary?.saved.length ?? 0;
 
-      // Invalidate the archive cache whenever the APOD backfill itself
-      // succeeded so any newly upserted APOD rows surface. EONET-only
-      // failures must NOT block this refetch (mixed-outcome path).
-      if (apodOk) {
+      // Invalidate the archive cache whenever any APOD rows were saved so
+      // newly upserted entries surface — regardless of per-date failures
+      // or the EONET outcome (partial-success / mixed-outcome paths).
+      if (savedCount > 0) {
         await queryClient.invalidateQueries({ queryKey: ['apod', 'archive'] });
       }
 
-      // Full success: unchanged message.
-      if (apodOk && eonetOk) {
-        const count = apodResult.value.length;
-        setStatus({
-          kind: 'success',
-          message:
-            count > 0
-              ? `Backfill complete — ${count} APOD entries refreshed.`
-              : 'Backfill complete. Archive refreshed.',
-        });
-        return;
-      }
-
-      // Full failure: keep the existing blanket-error messaging.
-      if (!apodOk && !eonetOk) {
+      // Full failure: both backfill triggers rejected (HTTP-level). Keep the
+      // existing blanket-error messaging.
+      if (!apodFulfilled && !eonetFulfilled) {
         const message = backfillErrorMessage(
-          rejectReason(apodResult) ?? rejectReason(eonetResult),
+          apodRejection ?? eonetRejection,
         );
         setStatus({ kind: 'error', message });
         return;
       }
 
-      // Mixed outcome: one feed succeeded, the other failed. Surface a
-      // distinct status so the user understands the APOD archive was
-      // refreshed even when EONET backfill failed (and vice versa), instead
-      // of a blanket error that implies nothing happened.
-      if (apodOk && !eonetOk) {
-        const count = apodResult.value.length;
-        const apodPart =
-          count > 0
-            ? `APOD history refreshed (${count} entries)`
-            : 'APOD history refreshed';
-        const eonetReason = backfillErrorMessage(rejectReason(eonetResult));
-        const eonetPart = eonetReason
-          ? `EONET backfill failed: ${eonetReason}`
-          : 'EONET backfill failed';
+      // Full success: both triggers succeeded AND the APOD backfill had no
+      // per-date failures. Keep the existing full-success messaging.
+      if (
+        apodFulfilled &&
+        eonetFulfilled &&
+        apodSummary &&
+        apodSummary.failed.length === 0
+      ) {
         setStatus({
-          kind: 'mixed',
-          message: `${apodPart}; ${eonetPart}.`,
+          kind: 'success',
+          message:
+            savedCount > 0
+              ? `Backfill complete — ${savedCount} APOD entries refreshed.`
+              : 'Backfill complete. Archive refreshed.',
         });
         return;
       }
 
-      // apod failed, eonet succeeded.
-      const apodReason = backfillErrorMessage(rejectReason(apodResult));
-      const apodPart = apodReason
-        ? `APOD backfill failed: ${apodReason}`
-        : 'APOD backfill failed';
-      setStatus({
-        kind: 'mixed',
-        message: `${apodPart}; EONET backfill refreshed.`,
-      });
+      // APOD returned 200 but every date failed (saved empty, failed>0) and
+      // EONET succeeded — surface as a failure-style status so the user
+      // understands nothing was actually saved.
+      if (
+        apodFulfilled &&
+        eonetFulfilled &&
+        apodSummary &&
+        savedCount === 0 &&
+        apodSummary.failed.length > 0
+      ) {
+        setStatus({ kind: 'error', message: apodStatusText(apodFulfilled, apodSummary, apodRejection) });
+        return;
+      }
+
+      // Mixed outcome: one feed has a partial / failed result. Surface a
+      // distinct status so the user understands what happened on each side
+      // (APOD-vs-EONET mixed messaging from misc-m12-polish, plus the new
+      // per-date partial APOD summary from VAL-PRODFIX2-005). Both concerns
+      // coexist in the same status text.
+      const apodPart = apodStatusText(apodFulfilled, apodSummary, apodRejection);
+      const eonetPart = eonetStatusText(eonetFulfilled, apodFulfilled, eonetRejection);
+      const message = eonetPart
+        ? `${apodPart}; ${eonetPart}.`
+        : `${apodPart}.`;
+      setStatus({ kind: 'mixed', message });
     } catch (err) {
       const message = backfillErrorMessage(err);
       setStatus({ kind: 'error', message });
