@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { buildCorsOptions } from './config/cors.config';
+import { NasaErrorsFilter } from './nasa/common/nasa-errors.filter';
 
 /**
  * Shared runtime wiring applied identically by the production bootstrap
@@ -43,6 +44,15 @@ export function configureApp(app: INestApplication): void {
     }),
   );
   app.setGlobalPrefix('api');
+  // Global exception filter mapping the NASA client's typed errors (plain
+  // `Error` subclasses, NOT HttpException) to meaningful HTTP status codes so
+  // a NASA failure never surfaces as a raw generic 500
+  // (VAL-PRODFIX2-003): NasaApiUnavailableError -> 503,
+  // NasaApiRateLimitError -> 429. Registered here (rather than via APP_FILTER)
+  // so BOTH main.ts and the integration test harness exercise the same
+  // mapping. The filter is a typed catch — HttpException and unknown errors
+  // keep their existing behavior.
+  app.useGlobalFilters(new NasaErrorsFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
