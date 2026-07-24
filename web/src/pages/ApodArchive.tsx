@@ -42,11 +42,24 @@ type BackfillStatus =
   | { kind: 'idle' }
   | { kind: 'pending' }
   | { kind: 'success'; message: string }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string }
+  | { kind: 'mixed'; message: string };
 
 /** Returns the rejection reason of a settled promise, or `null` if fulfilled. */
 function rejectReason<T>(result: PromiseSettledResult<T>): unknown | null {
   return result.status === 'rejected' ? result.reason : null;
+}
+
+/**
+ * Extracts a human-readable message from a backfill rejection reason
+ * (axios error → backend `message`, Error → `.message`, fallback string).
+ */
+function backfillErrorMessage(reason: unknown): string {
+  return (
+    (reason as { response?: { data?: { message?: string } } })?.response?.data
+      ?.message ??
+    (reason instanceof Error ? reason.message : 'Backfill failed. Please try again.')
+  );
 }
 
 /**
@@ -72,41 +85,77 @@ function BackfillControl() {
       // Fire both backfill triggers. The APOD backfill is the one that
       // populates the archive; the EONET backfill keeps event history fresh
       // in lockstep (the control backfills both NASA feeds at once).
+      // `Promise.allSettled` lets one feed succeed while the other fails so
+      // we can surface a mixed status instead of a blanket error.
       const [apodResult, eonetResult] = await Promise.allSettled([
         triggerApodBackfill(30),
         triggerEonetBackfill(),
       ]);
 
-      // Invalidate the archive cache regardless of the EONET result so any
-      // newly upserted APOD rows surface. Only invalidate when the APOD
-      // backfill itself succeeded.
-      if (apodResult.status === 'fulfilled') {
+      const apodOk = apodResult.status === 'fulfilled';
+      const eonetOk = eonetResult.status === 'fulfilled';
+
+      // Invalidate the archive cache whenever the APOD backfill itself
+      // succeeded so any newly upserted APOD rows surface. EONET-only
+      // failures must NOT block this refetch (mixed-outcome path).
+      if (apodOk) {
         await queryClient.invalidateQueries({ queryKey: ['apod', 'archive'] });
       }
 
-      if (apodResult.status === 'rejected' || eonetResult.status === 'rejected') {
-        const failed = rejectReason(apodResult) ?? rejectReason(eonetResult);
-        const message =
-          (failed as { response?: { data?: { message?: string } } })?.response?.data
-            ?.message ??
-          (failed instanceof Error ? failed.message : 'Backfill failed. Please try again.');
+      // Full success: unchanged message.
+      if (apodOk && eonetOk) {
+        const count = apodResult.value.length;
+        setStatus({
+          kind: 'success',
+          message:
+            count > 0
+              ? `Backfill complete — ${count} APOD entries refreshed.`
+              : 'Backfill complete. Archive refreshed.',
+        });
+        return;
+      }
+
+      // Full failure: keep the existing blanket-error messaging.
+      if (!apodOk && !eonetOk) {
+        const message = backfillErrorMessage(
+          rejectReason(apodResult) ?? rejectReason(eonetResult),
+        );
         setStatus({ kind: 'error', message });
         return;
       }
 
-      const count = apodResult.value.length;
-      setStatus({
-        kind: 'success',
-        message:
+      // Mixed outcome: one feed succeeded, the other failed. Surface a
+      // distinct status so the user understands the APOD archive was
+      // refreshed even when EONET backfill failed (and vice versa), instead
+      // of a blanket error that implies nothing happened.
+      if (apodOk && !eonetOk) {
+        const count = apodResult.value.length;
+        const apodPart =
           count > 0
-            ? `Backfill complete — ${count} APOD entries refreshed.`
-            : 'Backfill complete. Archive refreshed.',
+            ? `APOD history refreshed (${count} entries)`
+            : 'APOD history refreshed';
+        const eonetReason = backfillErrorMessage(rejectReason(eonetResult));
+        const eonetPart = eonetReason
+          ? `EONET backfill failed: ${eonetReason}`
+          : 'EONET backfill failed';
+        setStatus({
+          kind: 'mixed',
+          message: `${apodPart}; ${eonetPart}.`,
+        });
+        return;
+      }
+
+      // apod failed, eonet succeeded.
+      const apodReason = backfillErrorMessage(rejectReason(apodResult));
+      const apodPart = apodReason
+        ? `APOD backfill failed: ${apodReason}`
+        : 'APOD backfill failed';
+      setStatus({
+        kind: 'mixed',
+        message: `${apodPart}; EONET backfill refreshed.`,
       });
     } catch (err) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ??
-        (err instanceof Error ? err.message : 'Backfill failed. Please try again.');
+      const message = backfillErrorMessage(err);
       setStatus({ kind: 'error', message });
     }
   }
@@ -135,7 +184,9 @@ function BackfillControl() {
               ? 'text-sm text-red-600 dark:text-red-400'
               : status.kind === 'success'
                 ? 'text-sm text-green-600 dark:text-green-400'
-                : 'text-sm text-gray-500 dark:text-gray-400'
+                : status.kind === 'mixed'
+                  ? 'text-sm text-amber-600 dark:text-amber-400'
+                  : 'text-sm text-gray-500 dark:text-gray-400'
           }
         >
           {status.kind === 'pending'
@@ -144,7 +195,9 @@ function BackfillControl() {
               ? status.message
               : status.kind === 'error'
                 ? status.message
-                : ''}
+                : status.kind === 'mixed'
+                  ? status.message
+                  : ''}
         </p>
       )}
     </div>

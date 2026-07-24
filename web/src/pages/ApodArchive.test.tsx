@@ -641,37 +641,12 @@ describe('ApodArchive — VAL-PRODFIX-007 error path handling', () => {
     localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
   });
 
-  it('shows an error status and re-enables the button when backfill-apod fails', async () => {
+  it('full failure (both 500) shows the existing blanket error message', async () => {
     const user = userEvent.setup();
     server.use(
       authMeHandler(),
       listHandler(5),
-      backfillApodHandler([], { message: 'days must be an integer between 1 and 30' }, 500),
-      backfillEonetHandler(),
-    );
-
-    renderWithProviders(<ArchiveTree />, {
-      routerProps: { initialEntries: ['/apod/archive'] },
-    });
-
-    await screen.findAllByTestId('apod-archive-card');
-    await user.click(screen.getByTestId('apod-backfill-button'));
-
-    // The error status surfaces the backend message and the button re-enables.
-    const status = await screen.findByTestId('apod-backfill-status');
-    expect(status).toHaveTextContent(/backfill failed|integer between 1 and 30/i);
-    await waitFor(() => {
-      expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
-    });
-  });
-
-  it('shows an error status when backfill-eonet fails but apod succeeds', async () => {
-    const user = userEvent.setup();
-    const apodCalls: CapturedRequest[] = [];
-    server.use(
-      authMeHandler(),
-      listHandler(5),
-      backfillApodHandler(apodCalls, []),
+      backfillApodHandler([], { message: 'APOD backfill failed' }, 500),
       http.post('/api/nasa/triggers/backfill-eonet', () =>
         HttpResponse.json({ message: 'EONET backfill failed' }, { status: 500 }),
       ),
@@ -685,12 +660,126 @@ describe('ApodArchive — VAL-PRODFIX-007 error path handling', () => {
     await user.click(screen.getByTestId('apod-backfill-button'));
 
     const status = await screen.findByTestId('apod-backfill-status');
-    expect(status).toHaveTextContent(/eonet backfill failed|backfill failed/i);
-    // APOD backfill still succeeded, so the error path surfaces but the
-    // button is re-enabled.
+    // Full-failure path keeps the blanket "Backfill failed" wording and does
+    // NOT use the mixed "APOD history refreshed; EONET backfill failed" form.
+    expect(status).toHaveTextContent(/backfill failed/i);
+    expect(status).not.toHaveTextContent(/APOD history refreshed/i);
+    expect(status).not.toHaveTextContent(/EONET backfill refreshed/i);
     await waitFor(() => {
       expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
     });
-    expect(apodCalls).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// misc-m12-polish: mixed-outcome path (APOD 200 + EONET 500)
+// ---------------------------------------------------------------------------
+//
+// When APOD backfill succeeds but EONET backfill fails, the archive must
+// STILL refetch (APOD rows were upserted) and `apod-backfill-status` must
+// convey the EONET failure distinctly (a mixed status mentioning both the
+// APOD refresh and the EONET failure), instead of a blanket error that
+// implies nothing happened. The full-success and full-failure messages stay
+// unchanged (covered above and in the success-path suite).
+
+describe('ApodArchive — misc-m12-polish mixed outcome (APOD ok, EONET 500)', () => {
+  beforeEach(() => {
+    localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
+  });
+
+  it('archive still refetches and status conveys the EONET failure distinctly', async () => {
+    const user = userEvent.setup();
+    const apodCalls: CapturedRequest[] = [];
+    const eonetCalls: CapturedRequest[] = [];
+    const listCalls = { count: 0 };
+    server.use(
+      authMeHandler(),
+      // Archive total grows from 5 to 30 after the first request, so the
+      // post-invalidation refetch surfaces newly backfilled APOD rows.
+      growingListHandler(5, 30, listCalls),
+      backfillApodHandler(apodCalls, makeList(30, 1).data),
+      http.post('/api/nasa/triggers/backfill-eonet', async ({ request }) => {
+        eonetCalls.push({
+          url: request.url,
+          auth: request.headers.get('authorization'),
+          body: null,
+        });
+        return HttpResponse.json(
+          { message: 'EONET backfill failed' },
+          { status: 500 },
+        );
+      }),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    // Initially 5 entries (page 1) — one list call on mount.
+    const cardsBefore = await screen.findAllByTestId('apod-archive-card');
+    expect(cardsBefore).toHaveLength(5);
+    expect(listCalls.count).toBe(1);
+
+    await user.click(screen.getByTestId('apod-backfill-button'));
+
+    // Both backfill triggers fired.
+    await waitFor(() => {
+      expect(apodCalls).toHaveLength(1);
+    });
+    await waitFor(() => {
+      expect(eonetCalls).toHaveLength(1);
+    });
+
+    // APOD backfill succeeded → archive cache invalidated → list refetches
+    // (second list call) and now surfaces 20 cards (total=30, page 1).
+    await waitFor(() => {
+      expect(listCalls.count).toBeGreaterThanOrEqual(2);
+    });
+    const cardsAfter = await screen.findAllByTestId('apod-archive-card');
+    expect(cardsAfter).toHaveLength(20);
+
+    // Mixed status: mentions BOTH the APOD refresh AND the EONET failure
+    // (not a blanket "Backfill failed" that implies nothing happened).
+    const status = await screen.findByTestId('apod-backfill-status');
+    expect(status).toHaveTextContent(/APOD history refreshed/i);
+    expect(status).toHaveTextContent(/EONET backfill failed/i);
+    // And it must NOT collapse to the generic full-failure wording.
+    expect(status).not.toHaveTextContent(/^Backfill failed\.?\s*$/i);
+
+    // Button re-enables after the mixed outcome.
+    await waitFor(() => {
+      expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
+    });
+  });
+
+  it('mixed outcome (APOD 500 + EONET 200) surfaces a distinct mixed status with backend error', async () => {
+    const user = userEvent.setup();
+    server.use(
+      authMeHandler(),
+      listHandler(5),
+      backfillApodHandler(
+        [],
+        { message: 'days must be an integer between 1 and 30' },
+        500,
+      ),
+      backfillEonetHandler(),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    await screen.findAllByTestId('apod-archive-card');
+    await user.click(screen.getByTestId('apod-backfill-button'));
+
+    const status = await screen.findByTestId('apod-backfill-status');
+    // APOD failed, EONET succeeded: mixed status mentions both halves and
+    // surfaces the backend error message from the APOD rejection.
+    expect(status).toHaveTextContent(/APOD backfill failed/i);
+    expect(status).toHaveTextContent(/integer between 1 and 30/i);
+    expect(status).toHaveTextContent(/EONET backfill refreshed/i);
+    await waitFor(() => {
+      expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
+    });
   });
 });
