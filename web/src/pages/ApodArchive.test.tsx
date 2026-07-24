@@ -422,7 +422,11 @@ interface CapturedRequest {
 
 function backfillApodHandler(
   captured: CapturedRequest[] = [],
-  response: JsonBodyType | (() => JsonBodyType) = [],
+  response: JsonBodyType | (() => JsonBodyType) = {
+    requestedDays: 30,
+    saved: [],
+    failed: [],
+  },
   status = 200,
   delayMs = 0,
 ) {
@@ -436,6 +440,22 @@ function backfillApodHandler(
     if (delayMs > 0) await delay(delayMs);
     return HttpResponse.json(body, { status });
   });
+}
+
+/**
+ * Build the new partial-success summary body
+ * `{ requestedDays, saved, failed }` (VAL-PRODFIX2-004) returned by
+ * `POST /api/nasa/triggers/backfill-apod`. `saved` is a list of APOD-entry
+ * shaped rows; `failed` is a list of `{ date, reason }`. The component only
+ * reads `saved.length` / `failed.length` / `requestedDays`, so the entries
+ * can be fixtures from `makeEntry`.
+ */
+function apodBackfillSummaryBody(
+  saved: ReturnType<typeof makeEntry>[] = [],
+  failed: { date: string; reason: string }[] = [],
+  requestedDays = 30,
+) {
+  return { requestedDays, saved, failed };
 }
 
 function backfillEonetHandler(
@@ -526,7 +546,7 @@ describe('ApodArchive — VAL-PRODFIX-007 click fires both POSTs with auth', () 
     server.use(
       authMeHandler(),
       listHandler(5),
-      backfillApodHandler(apodCalls, []),
+      backfillApodHandler(apodCalls, apodBackfillSummaryBody()),
       backfillEonetHandler(eonetCalls),
     );
 
@@ -565,7 +585,7 @@ describe('ApodArchive — VAL-PRODFIX-007 button disabled while pending', () => 
       authMeHandler(),
       listHandler(5),
       // Delay the backfill responses so we can observe the pending state.
-      backfillApodHandler([], [], 200, 500),
+      backfillApodHandler([], apodBackfillSummaryBody(), 200, 500),
       backfillEonetHandler([], 200, 500),
     );
 
@@ -607,7 +627,10 @@ describe('ApodArchive — VAL-PRODFIX-007 invalidation + refetch on success', ()
     server.use(
       authMeHandler(),
       growingListHandler(5, 30, listCalls),
-      backfillApodHandler([], makeList(30, 1).data),
+      backfillApodHandler(
+        [],
+        apodBackfillSummaryBody(makeList(30, 1).data),
+      ),
       backfillEonetHandler(),
     );
 
@@ -697,7 +720,10 @@ describe('ApodArchive — misc-m12-polish mixed outcome (APOD ok, EONET 500)', (
       // Archive total grows from 5 to 30 after the first request, so the
       // post-invalidation refetch surfaces newly backfilled APOD rows.
       growingListHandler(5, 30, listCalls),
-      backfillApodHandler(apodCalls, makeList(30, 1).data),
+      backfillApodHandler(
+        apodCalls,
+        apodBackfillSummaryBody(makeList(30, 1).data),
+      ),
       http.post('/api/nasa/triggers/backfill-eonet', async ({ request }) => {
         eonetCalls.push({
           url: request.url,
@@ -778,6 +804,123 @@ describe('ApodArchive — misc-m12-polish mixed outcome (APOD ok, EONET 500)', (
     expect(status).toHaveTextContent(/APOD backfill failed/i);
     expect(status).toHaveTextContent(/integer between 1 and 30/i);
     expect(status).toHaveTextContent(/EONET backfill refreshed/i);
+    await waitFor(() => {
+      expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VAL-PRODFIX2-005: UI backfill control surfaces partial outcome and still
+// refreshes
+// ---------------------------------------------------------------------------
+//
+// The APOD backfill endpoint now returns a partial-success summary
+// `{ requestedDays, saved, failed }` (VAL-PRODFIX2-004) instead of a bare
+// array, so a single unavailable date (e.g. today's APOD not yet published)
+// no longer aborts the loop or surfaces a 500. The BackfillControl must
+// consume that summary: on a mixed per-date result it shows how many
+// entries were saved and that some failed (e.g. "Saved 29 of 30, 1
+// failed") via `apod-backfill-status`, and STILL invalidates/refetches the
+// archive react-query cache because `saved.length > 0`. The existing
+// full-success and full-failure messages must remain correct (covered
+// above), and the APOD-vs-EONET mixed messaging from misc-m12-polish must
+// still coexist with the new per-date partial summary.
+
+describe('ApodArchive — VAL-PRODFIX2-005 partial APOD summary', () => {
+  beforeEach(() => {
+    localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
+  });
+
+  it('mixed per-date result (29 saved, 1 failed) conveys saved count + failure and refetches the archive', async () => {
+    const user = userEvent.setup();
+    const listCalls = { count: 0 };
+    // 29 saved APOD entries (the component only reads saved.length), and one
+    // date that NASA-404'd (e.g. today's APOD not yet published).
+    const savedEntries = Array.from({ length: 29 }, (_, i) => makeEntry(i));
+    const failedEntries = [
+      { date: '2025-07-24', reason: 'APOD not yet published for this date' },
+    ];
+    server.use(
+      authMeHandler(),
+      // Archive total grows from 5 to 30 after the first request, so the
+      // post-invalidation refetch surfaces the newly backfilled APOD rows.
+      growingListHandler(5, 30, listCalls),
+      backfillApodHandler(
+        [],
+        apodBackfillSummaryBody(savedEntries, failedEntries, 30),
+      ),
+      backfillEonetHandler(),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    // Initially 5 entries (page 1) — one list call on mount.
+    const cardsBefore = await screen.findAllByTestId('apod-archive-card');
+    expect(cardsBefore).toHaveLength(5);
+    expect(listCalls.count).toBe(1);
+
+    await user.click(screen.getByTestId('apod-backfill-button'));
+
+    // saved.length (29) > 0 → archive cache invalidated → list refetches
+    // (second list call) and now surfaces 20 cards (total=30, page 1).
+    await waitFor(() => {
+      expect(listCalls.count).toBeGreaterThanOrEqual(2);
+    });
+    const cardsAfter = await screen.findAllByTestId('apod-archive-card');
+    expect(cardsAfter).toHaveLength(20);
+
+    // Status conveys BOTH the saved count and the failure (the canonical
+    // "Saved 29 of 30, 1 failed" form per VAL-PRODFIX2-005).
+    const status = await screen.findByTestId('apod-backfill-status');
+    expect(status).toHaveTextContent(/Saved 29 of 30/i);
+    expect(status).toHaveTextContent(/1 failed/i);
+    // It must NOT collapse to the generic full-failure wording.
+    expect(status).not.toHaveTextContent(/^Backfill failed\.?\s*$/i);
+
+    // Button re-enables after the partial outcome.
+    await waitFor(() => {
+      expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
+    });
+  });
+
+  it('all dates failed (saved 0, failed 30) surfaces a failure status and does not refetch', async () => {
+    const user = userEvent.setup();
+    const listCalls = { count: 0 };
+    const failedEntries = Array.from({ length: 30 }, (_, i) => ({
+      date: `2025-07-${String(25 - i).padStart(2, '0')}`,
+      reason: 'NASA unavailable',
+    }));
+    server.use(
+      authMeHandler(),
+      // Total stays 5 across calls; we only care about the call count to
+      // prove the archive was NOT refetched when saved.length === 0.
+      growingListHandler(5, 5, listCalls),
+      backfillApodHandler(
+        [],
+        apodBackfillSummaryBody([], failedEntries, 30),
+      ),
+      backfillEonetHandler(),
+    );
+
+    renderWithProviders(<ArchiveTree />, {
+      routerProps: { initialEntries: ['/apod/archive'] },
+    });
+
+    await screen.findAllByTestId('apod-archive-card');
+    expect(listCalls.count).toBe(1);
+
+    await user.click(screen.getByTestId('apod-backfill-button'));
+
+    // saved.length (0) → archive cache NOT invalidated → no extra refetch.
+    const status = await screen.findByTestId('apod-backfill-status');
+    expect(status).toHaveTextContent(/APOD backfill failed/i);
+    expect(status).toHaveTextContent(/all 30 date/i);
+    // No new archive list calls beyond the initial mount fetch.
+    expect(listCalls.count).toBe(1);
+
     await waitFor(() => {
       expect(screen.getByTestId('apod-backfill-button')).not.toBeDisabled();
     });

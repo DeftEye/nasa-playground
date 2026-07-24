@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { buildServeStaticOptions } from './config/serve-static.config';
 import { validateEnv } from './config/env.validation';
 import { CustomersModule } from './customers/customers.module';
 import { AuthModule } from './auth/auth.module';
@@ -29,14 +30,11 @@ import { GlobalJwtAuthGuard } from './auth/global-jwt-auth.guard';
 function maybeServeStatic(): DynamicModule[] {
   const webDist = join(__dirname, '..', 'web', 'dist');
   if (process.env.NODE_ENV === 'production' && existsSync(webDist)) {
-    return [
-      ServeStaticModule.forRoot({
-        rootPath: webDist,
-        // Exclude API routes so NestJS controllers handle /api/* (architecture §1).
-        exclude: ['/api/(.*)'],
-        serveRoot: '/',
-      }),
-    ];
+    // Delegates to `buildServeStaticOptions` so the SPA deep-link fallback
+    // wiring (exclude /api/*, default renderPath catch-all -> index.html) is
+    // unit/integration-testable against a fixture dist without flipping
+    // NODE_ENV (see `spa-fallback.integration.spec.ts`).
+    return [ServeStaticModule.forRoot(...buildServeStaticOptions(webDist))];
   }
   return [];
 }

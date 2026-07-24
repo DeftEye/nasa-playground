@@ -91,7 +91,12 @@ export class ApodScheduler implements OnModuleInit {
       const count = await this.apodService.count();
       if (count === 0) {
         this.logger.log('APOD table empty on boot; running 30-day backfill.');
-        await this.runWithRetry(() => this.apodService.backfill(30));
+        // `failFast = true` makes the boot backfill throw on the FIRST date
+        // failure (instead of collecting partial results) so
+        // {@link runWithRetry} re-attempts the whole loop with 1s/3s/9s
+        // backoff (architecture §12 / VAL-SCHED-009). The manual trigger
+        // endpoint uses the default partial-success path (VAL-PRODFIX2-004).
+        await this.runWithRetry(() => this.apodService.backfill(30, true));
         return;
       }
       const today = todayUtc();

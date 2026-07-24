@@ -26,6 +26,20 @@ interface ApodRow {
   fetchedAt: string;
 }
 
+interface ApodBackfillFailure {
+  date: string;
+  reason: string;
+}
+
+interface ApodBackfillResult {
+  requestedDays: number;
+  saved: ApodRow[];
+  failed: ApodBackfillFailure[];
+}
+
+const asBackfill = (res: Response): ApodBackfillResult =>
+  res.body as ApodBackfillResult;
+
 interface EonetFetchResult {
   detected: string[];
   updated: string[];
@@ -223,9 +237,11 @@ describe('Backfill triggers (integration)', () => {
       .query({ days: 30 })
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    // Response is an array of persisted rows.
-    const rows = res.body as ApodRow[];
-    expect(rows).toHaveLength(30);
+    // Response is a partial-success summary (VAL-PRODFIX2-004 shape).
+    const result = asBackfill(res);
+    expect(result.requestedDays).toBe(30);
+    expect(result.failed).toEqual([]);
+    expect(result.saved).toHaveLength(30);
     // Row count increased to 31 (seed + 30 backfilled).
     expect(await countApod()).toBe(31);
 
@@ -246,7 +262,10 @@ describe('Backfill triggers (integration)', () => {
       .post('/api/nasa/triggers/backfill-apod')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect((res.body as ApodRow[]).length).toBe(30);
+    const result = asBackfill(res);
+    expect(result.requestedDays).toBe(30);
+    expect(result.failed).toEqual([]);
+    expect(result.saved.length).toBe(30);
     expect(await countApod()).toBe(30);
   });
 
@@ -260,8 +279,108 @@ describe('Backfill triggers (integration)', () => {
       .query({ days: 5 })
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect((res.body as ApodRow[]).length).toBe(5);
+    const result = asBackfill(res);
+    expect(result.requestedDays).toBe(5);
+    expect(result.failed).toEqual([]);
+    expect(result.saved.length).toBe(5);
     expect(await countApod()).toBe(5);
+  });
+
+  // VAL-PRODFIX2-004 (mixed result: one date NASA-404s -> 200 with 29 saved
+  // and a reported failed entry, 29 rows persisted, NO 500)
+  it('POST /api/nasa/triggers/backfill-apod?days=30 with one date NASA-404ing returns 200 with 29 saved and 1 failed (no 500)', async () => {
+    const token = await loginAndGetToken(context);
+
+    // Mock the last 30 consecutive dates; today's date (dateNDaysAgo(0)) NASA-404s
+    // (mirrors "today's APOD not yet published"), the other 29 succeed.
+    const dates: string[] = [];
+    for (let i = 29; i >= 0; i -= 1) {
+      const d = dateNDaysAgo(i);
+      dates.push(d);
+      if (i === 0) {
+        nock(NASA_BASE)
+          .get(APOD_PATH)
+          .query((q) => q.date === d)
+          .reply(404, 'APOD not yet published for today', {
+            'content-type': 'application/json',
+          });
+      } else {
+        nock(NASA_BASE)
+          .get(APOD_PATH)
+          .query((q) => q.date === d)
+          .reply(200, apodMock({ date: d, title: `Backfill ${d}` }), {
+            'content-type': 'application/json',
+          });
+      }
+    }
+    const failedDate = dates[dates.length - 1]; // today
+    const savedDates = dates.filter((d) => d !== failedDate);
+
+    const res = await context.http
+      .post('/api/nasa/triggers/backfill-apod')
+      .query({ days: 30 })
+      .set('Authorization', `Bearer ${token}`);
+
+    // The headline invariant: a single failing date never produces a 500.
+    expect(res.status).toBe(200);
+
+    const result = asBackfill(res);
+    expect(result.requestedDays).toBe(30);
+    // 29 of the 30 dates succeeded and were persisted.
+    expect(result.saved).toHaveLength(29);
+    // The single failed date is reported with a reason.
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].date).toBe(failedDate);
+    expect(typeof result.failed[0].reason).toBe('string');
+    expect(result.failed[0].reason.length).toBeGreaterThan(0);
+
+    // The saved entries cover exactly the 29 non-failed dates.
+    const savedResponseDates = result.saved.map((r) => r.date).sort();
+    expect(savedResponseDates).toEqual([...savedDates].sort());
+
+    // 29 rows persisted in DB (the failed date is NOT stored).
+    expect(await countApod()).toBe(29);
+    const failedDbRow: ApodRow[] = await dataSource.query(
+      'SELECT date FROM apod_entries WHERE date = $1',
+      [failedDate],
+    );
+    expect(failedDbRow).toHaveLength(0);
+
+    // The 29 saved dates are present.
+    const storedDates: Array<{ date: string }> = await dataSource.query(
+      'SELECT date::text AS date FROM apod_entries ORDER BY date ASC',
+    );
+    expect(storedDates.map((r) => r.date)).toEqual([...savedDates].sort());
+  });
+
+  // VAL-PRODFIX2-004 (full-failure path: every date 404s -> still 200, no 500,
+  // empty saved, every date reported in failed, no rows persisted)
+  it('POST /api/nasa/triggers/backfill-apod?days=3 with every date NASA-404ing returns 200 with 0 saved and 3 failed (no 500)', async () => {
+    const token = await loginAndGetToken(context);
+    const dates: string[] = [];
+    for (let i = 2; i >= 0; i -= 1) {
+      const d = dateNDaysAgo(i);
+      dates.push(d);
+      nock(NASA_BASE)
+        .get(APOD_PATH)
+        .query((q) => q.date === d)
+        .reply(404, 'APOD unavailable', {
+          'content-type': 'application/json',
+        });
+    }
+
+    const res = await context.http
+      .post('/api/nasa/triggers/backfill-apod')
+      .query({ days: 3 })
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200); // no 500 even when every date fails
+    const result = asBackfill(res);
+    expect(result.requestedDays).toBe(3);
+    expect(result.saved).toEqual([]);
+    expect(result.failed.map((f) => f.date).sort()).toEqual([...dates].sort());
+    expect(result.failed.every((f) => f.reason.length > 0)).toBe(true);
+    expect(await countApod()).toBe(0);
   });
 
   // VAL-PRODFIX-004 (idempotency)
