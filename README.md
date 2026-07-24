@@ -63,6 +63,8 @@ npm run start:prod         # node dist/main — serves both API and FE on port 3
 
 In production, `synchronize` is disabled and the schema must be applied via migrations. On a fresh database, `npm run start:prod` will fail to boot if migrations have not run. `@nestjs/serve-static` mounts `web/dist` so the built frontend is served at `/` and the API at `/api/*` from a single Node process on port 3000. No CORS headers are emitted (same-origin).
 
+**SPA deep-link fallback:** the production stack serves the SPA shell for any non-`/api/*` GET that does not resolve to a static asset. Hard-navigating or refreshing a client-side route (for example `/apod/archive`, `/globe`, `/login`) returns the SPA `index.html` (200 `text/html`) so React Router renders the right page instead of a JSON 404. Unknown `/api/*` routes still return the standard Nest JSON 404.
+
 ## Environment Variables
 
 See `.env.example` for a template. All keys with defaults are optional.
@@ -148,7 +150,7 @@ Subscribers are Discord notification targets owned by a user. Each subscriber ha
 | `GET` | `/api/nasa/eonet/events` | EONET events (filtered) |
 | `GET` | `/api/nasa/eonet/events/map` | Map-ready EONET events (one normalized `{lat, lng}` per event; rolling 7/14/30-day window; optional `category`/`status` filters) for the globe view |
 | `POST` | `/api/nasa/triggers/fetch-eonet` | Manual EONET fetch |
-| `POST` | `/api/nasa/triggers/backfill-apod?days=30` | Backfill up to `days` (int 1–30, default 30) days of APOD entries; idempotent; returns 200; 400 on invalid `days` |
+| `POST` | `/api/nasa/triggers/backfill-apod?days=30` | Backfill up to `days` (int 1–30, default 30) days of APOD entries; idempotent; per-date fault-tolerant — a single unavailable date is recorded in `failed` rather than aborting the loop or returning 500; returns 200 with a partial-success summary `{ requestedDays, saved, failed }`; 400 on invalid `days` |
 | `POST` | `/api/nasa/triggers/backfill-eonet` | Re-ingest the recent EONET window (open + closed-within-window) idempotently; returns 200 with a `{detected, updated, skipped, unchanged}` diff summary |
 | `GET` | `/api/nasa/health` | Health check (DB + NASA reachability) |
 
@@ -313,3 +315,4 @@ docker compose -f docker-compose.prod.yml down -v
 - **EONET closed-window**: closed events are only fetched within `EONET_CLOSED_WINDOW_DAYS` (default 30) to avoid unbounded fetches.
 - **Webhook URL privacy**: raw Discord webhook URLs exist only in `subscribers.discord_webhook_url`; all API responses and notification log payloads use the redacted form `/webhooks/.../<last-4>`.
 - **JWT secret rotation**: change `JWT_SECRET` and restart; all previously-issued tokens become invalid.
+- **NASA upstream error mapping**: NASA's typed client errors (non-`HttpException` `Error` subclasses) are mapped by a global exception filter to meaningful HTTP responses — `NasaApiUnavailableError` → `503 Service Unavailable`, `NasaApiRateLimitError` → `429 Too Many Requests` (JSON body matching Nest's standard `{ statusCode, message, error }` shape). NASA-backed endpoints no longer surface a raw generic 500.
