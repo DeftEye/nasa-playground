@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { renderWithProviders } from '../test/render';
@@ -209,12 +209,16 @@ describe('RootRoute (VAL-ROUTING-001, VAL-ROUTING-004)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('landing-hero')).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute(
-      'href',
-      '/login',
-    );
+    // The landing page now exposes Sign in / Create account links in both
+    // the hero CTAs and the footer (m14-landing-page). Scope to the hero to
+    // assert the primary CTA hrefs deterministically without weakening the
+    // check (both surfaces link to the same destinations).
+    const hero = screen.getByTestId('landing-hero');
     expect(
-      screen.getByRole('link', { name: /create account/i }),
+      within(hero).getByRole('link', { name: /sign in/i }),
+    ).toHaveAttribute('href', '/login');
+    expect(
+      within(hero).getByRole('link', { name: /create account/i }),
     ).toHaveAttribute('href', '/register');
     expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument();
     expect(screen.queryByText('Login page')).not.toBeInTheDocument();

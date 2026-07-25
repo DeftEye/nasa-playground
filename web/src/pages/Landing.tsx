@@ -2,60 +2,269 @@ import { Link } from 'react-router-dom';
 
 /**
  * Landing page — public space-themed marketing page
- * (architecture §6 / VAL-ROUTING-001, 004).
+ * (architecture §6 / VAL-LANDING-001..005, VAL-ROUTING-001, 004).
  *
  * Rendered OUTSIDE `ProtectedRoute` at `/` via the `RootRoute` wrapper in
  * `App.tsx`. Unauthenticated visitors see this page; authenticated visitors
- * are redirected to `/dashboard` by `RootRoute` before this component
- * mounts.
+ * are redirected to `/dashboard` by `RootRoute` before this component mounts.
  *
- * This is the M14 routing placeholder: it ships the minimum public surface
- * (hero area + a "Sign in" link to `/login` + a "Create account" link to
- * `/register`) styled with the cosmic tokens. The FULL hero art, feature
- * highlights, and footer are filled in by the next feature
- * (`m14-landing-page`), which extends this same component. Do not over-style
- * here — keep it minimal and on-token.
+ * Sections:
+ *  (a) HERO — cosmic art using `/landing-hero.jpg` layered OVER a CSS cosmic
+ *      gradient + starfield fallback. The image is referenced via a CSS
+ *      `background-image` (never imported through the bundler) so a missing
+ *      `web/public/landing-hero.jpg` never breaks the build or tests, and the
+ *      hero is never blank/broken. Includes the product name, a tagline about
+ *      exploring the cosmos and tracking Earth's natural events, and two CTAs
+ *      (react-router `Link`): primary "Sign in" -> `/login` and
+ *      "Create account" -> `/register`.
+ *  (b) FEATURE HIGHLIGHTS — three cards conveying the daily Astronomy
+ *      Picture of the Day (APOD), EONET natural-event tracking, and the
+ *      interactive 3D globe.
+ *  (c) FOOTER — product name, short attribution to NASA APOD/EONET data,
+ *      and links.
  *
- * Landing hero asset: `web/public/landing-hero.jpg` is referenced via a CSS
- * `background-image` layered OVER a cosmic gradient/starfield fallback so a
- * missing asset never breaks the build or renders blank.
+ * All styling uses the cosmic tokens/primitives from m14-cosmic-theme-foundation
+ * (`web/src/index.css`): `bg-deep-space-*`, `text-star-white`, `text-muted`,
+ * `text-nebula-purple*`, `card-cosmic`, `btn-primary`, `btn-secondary`, etc.
  */
 export function Landing() {
   return (
-    <div className="min-h-screen text-star-white">
-      {/* Hero area — cosmic gradient/starfield fallback with the optional
-       * landing-hero.jpg layered on top. The image is served at
-       * /landing-hero.jpg and may be absent; the gradient still reads. */}
+    <div className="flex min-h-screen flex-col text-star-white">
+      {/* ====================================================================
+       * (a) HERO
+       * --------------------------------------------------------------------
+       * The hero element stacks two layers:
+       *   1. A CSS cosmic gradient + starfield fallback (always rendered via
+       *      `background-color` + layered `radial-gradient` pinpoints,
+       *      inherited from `body` plus this section's own fallback below).
+       *   2. The optional `/landing-hero.jpg` image layered on top via a
+       *      `linear-gradient` + `url('/landing-hero.jpg')` background-image.
+       *
+       * The image is referenced by URL (served from `web/public/`), NEVER
+       * imported through the bundler, so an absent asset does not fail the
+       * build or tests. When the file is missing the browser simply drops
+       * that layer and the gradient/starfield fallback remains — the hero is
+       * never blank or broken (VAL-LANDING-005).
+       * ================================================================= */}
       <section
-        className="relative flex min-h-[70vh] flex-col items-center justify-center px-4 text-center"
+        className="relative flex min-h-[78vh] flex-col items-center justify-center px-4 text-center"
         style={{
+          // Cosmic fallback base (always present) — deep-space vertical
+          // gradient + a subtle starfield of static radial-gradient
+          // pinpoints. This reads even if /landing-hero.jpg is absent.
           backgroundColor: 'var(--color-deep-space-base)',
-          backgroundImage:
-            "linear-gradient(180deg, rgba(4,4,12,0.55) 0%, rgba(10,10,26,0.75) 100%), url('/landing-hero.jpg')",
-          backgroundSize: 'cover',
+          backgroundImage: [
+            // Starfield pinpoints (fallback layer).
+            'radial-gradient(1.5px 1.5px at 18% 22%, rgba(255,255,255,0.8) 50%, transparent 51%)',
+            'radial-gradient(1px 1px at 32% 68%, rgba(255,255,255,0.55) 50%, transparent 51%)',
+            'radial-gradient(1.5px 1.5px at 51% 38%, rgba(255,255,255,0.7) 50%, transparent 51%)',
+            'radial-gradient(1px 1px at 67% 14%, rgba(255,255,255,0.5) 50%, transparent 51%)',
+            'radial-gradient(1.5px 1.5px at 79% 62%, rgba(255,255,255,0.65) 50%, transparent 51%)',
+            'radial-gradient(1px 1px at 88% 84%, rgba(255,255,255,0.55) 50%, transparent 51%)',
+            'radial-gradient(1px 1px at 24% 88%, rgba(255,255,255,0.6) 50%, transparent 51%)',
+            // Cosmic vertical gradient (fallback layer).
+            'linear-gradient(180deg, var(--color-deep-space-darker) 0%, var(--color-deep-space-base) 40%, var(--color-deep-space-lighter) 70%, var(--color-deep-space-darker) 100%)',
+            // Optional hero image (top layer), darkened by a translucent
+            // overlay gradient so the headline remains legible. If the file
+            // is absent the browser ignores this layer and the fallbacks
+            // above remain. The url() is never bundler-imported.
+            "linear-gradient(180deg, rgba(4,4,12,0.65) 0%, rgba(10,10,26,0.55) 60%, rgba(4,4,12,0.8) 100%), url('/landing-hero.jpg')",
+          ].join(', '),
+          backgroundSize: 'cover, cover, cover, cover, cover, cover, cover, cover, cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'scroll',
         }}
         data-testid="landing-hero"
       >
-        <div className="max-w-2xl">
-          <h1 className="font-display text-4xl font-bold tracking-tight text-star-white sm:text-5xl">
+        <div className="max-w-3xl px-2">
+          {/* Product name / logo */}
+          <p className="mb-3 font-display text-sm font-semibold uppercase tracking-[0.25em] text-nebula-purple-soft">
             NASA Sky Tracker
-          </h1>
-          <p className="mt-4 text-lg text-muted">
-            Explore the cosmos daily. APOD, EONET natural events, and a 3D
-            globe of Earth's fire and storms — all in one cosmic dashboard.
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link to="/login" className="btn-primary w-full sm:w-auto">
+
+          <h1 className="font-display text-4xl font-bold tracking-tight text-star-white sm:text-5xl md:text-6xl">
+            Explore the cosmos.
+            <br />
+            <span className="text-nebula-purple-soft">Track Earth&apos;s</span>{' '}
+            <span className="text-coral">natural events.</span>
+          </h1>
+
+          {/* Tagline */}
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted sm:text-xl">
+            A single cosmic dashboard for the daily Astronomy Picture of the
+            Day, NASA EONET wildfire and storm tracking, and an interactive 3D
+            globe of Earth&apos;s fire and weather — all in one place.
+          </p>
+
+          {/* CTAs */}
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              to="/login"
+              className="btn-primary w-full sm:w-auto"
+              data-testid="landing-cta-signin"
+            >
               Sign in
             </Link>
-            <Link to="/register" className="btn-secondary w-full sm:w-auto">
+            <Link
+              to="/register"
+              className="btn-secondary w-full sm:w-auto"
+              data-testid="landing-cta-register"
+            >
               Create account
             </Link>
           </div>
         </div>
       </section>
+
+      {/* ====================================================================
+       * (b) FEATURE HIGHLIGHTS
+       * --------------------------------------------------------------------
+       * Three cards conveying the daily APOD, EONET natural-event tracking,
+       * and the interactive 3D globe. Each carries its required data-testid.
+       * ================================================================= */}
+      <section
+        aria-label="Feature highlights"
+        className="mx-auto w-full max-w-5xl px-4 py-16 sm:py-20"
+      >
+        <h2 className="section-heading mb-10 text-center text-2xl sm:text-3xl">
+          Three windows into the universe
+        </h2>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          {/* APOD */}
+          <article
+            className="card-cosmic flex flex-col p-6"
+            data-testid="landing-feature-apod"
+          >
+            <div
+              aria-hidden
+              className="mb-4 flex h-10 w-10 items-center justify-center rounded-full text-xl"
+              style={{
+                background:
+                  'linear-gradient(135deg, var(--color-nebula-indigo), var(--color-nebula-purple))',
+                color: 'var(--color-star-white)',
+              }}
+            >
+              ✦
+            </div>
+            <h3 className="font-display text-xl font-semibold text-star-white">
+              Astronomy Picture of the Day
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              Each day NASA selects a breathtaking image of our universe.
+              Browse the archive, replay past wonders, and never miss a new
+              APOD — including embedded videos when NASA publishes them.
+            </p>
+          </article>
+
+          {/* EONET */}
+          <article
+            className="card-cosmic flex flex-col p-6"
+            data-testid="landing-feature-eonet"
+          >
+            <div
+              aria-hidden
+              className="mb-4 flex h-10 w-10 items-center justify-center rounded-full text-xl"
+              style={{
+                background:
+                  'linear-gradient(135deg, var(--color-coral), var(--color-dune))',
+                color: 'var(--color-deep-space-darker)',
+              }}
+            >
+              🔥
+            </div>
+            <h3 className="font-display text-xl font-semibold text-star-white">
+              EONET natural-event tracking
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              NASA&apos;s EONET feed tracks wildfires, severe storms,
+              volcanoes, and more across the planet. Filter by category and
+              status, then get Discord notifications the moment something
+              noteworthy happens.
+            </p>
+          </article>
+
+          {/* 3D Globe */}
+          <article
+            className="card-cosmic flex flex-col p-6"
+            data-testid="landing-feature-globe"
+          >
+            <div
+              aria-hidden
+              className="mb-4 flex h-10 w-10 items-center justify-center rounded-full text-xl"
+              style={{
+                background:
+                  'linear-gradient(135deg, var(--color-nebula-purple-soft), var(--color-nebula-indigo))',
+                color: 'var(--color-star-white)',
+              }}
+            >
+              🌍
+            </div>
+            <h3 className="font-display text-xl font-semibold text-star-white">
+              Interactive 3D globe
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              Spin a real-time 3D Earth and see where every event is
+              happening. Click any country to surface the EONET events that
+              occurred there in the last 30 days.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      {/* ====================================================================
+       * (c) FOOTER
+       * --------------------------------------------------------------------
+       * Product name, short attribution to NASA APOD/EONET data, and links.
+       * ================================================================= */}
+      <footer
+        className="mt-auto border-t border-nebula-purple/20 bg-deep-space-darker/70"
+        data-testid="landing-footer"
+      >
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-muted sm:flex-row">
+          <p className="font-display text-base font-semibold text-star-white">
+            NASA Sky Tracker
+          </p>
+          <p className="text-center sm:text-right">
+            Data &amp; imagery courtesy of{' '}
+            <a
+              href="https://apod.nasa.gov"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-nebula-purple-soft hover:text-star-white transition-colors"
+            >
+              NASA APOD
+            </a>{' '}
+            &amp;{' '}
+            <a
+              href="https://eonet.gsfc.nasa.gov"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-nebula-purple-soft hover:text-star-white transition-colors"
+            >
+              NASA EONET
+            </a>
+            . Built for exploration and education.
+          </p>
+          <nav className="flex items-center gap-4">
+            <Link
+              to="/login"
+              className="hover:text-star-white transition-colors"
+              data-testid="landing-footer-signin"
+            >
+              Sign in
+            </Link>
+            <Link
+              to="/register"
+              className="hover:text-star-white transition-colors"
+              data-testid="landing-footer-register"
+            >
+              Create account
+            </Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }
