@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { Skeleton } from './Skeleton';
 import { Landing } from '../pages/Landing';
@@ -16,13 +16,28 @@ import { Landing } from '../pages/Landing';
  *   render the same loading skeleton used by `ProtectedRoute` so the
  *   Landing page does not flash to a logged-in user.
  * - Once bootstrap resolves:
- *   - `user` present → `<Navigate to="/dashboard" replace />`.
+ *   - `user` present → redirect. The destination honors a deep-link return
+ *     path stored in `location.state.from.pathname` (preserved by
+ *     `ProtectedRoute` when it bounces a logged-out user to `/login`,
+ *     VAL-ROUTING-005), falling back to `/dashboard` when no return path
+ *     is present (VAL-ROUTING-004 — authed visit to `/` with no `from`
+ *     still lands on `/dashboard`).
  *   - `user === null` → render `<Landing />` (the public marketing page).
  *
  * The token is never placed in the URL (VAL-FE-AUTH-012).
  */
+const PUBLIC_ONLY_PATHS = new Set(['/login', '/register']);
+
+function pickReturnPath(pathname: string | undefined): string {
+  if (pathname && !PUBLIC_ONLY_PATHS.has(pathname)) {
+    return pathname;
+  }
+  return '/dashboard';
+}
+
 export function RootRoute() {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -35,7 +50,9 @@ export function RootRoute() {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    const fromPath = (location.state as { from?: { pathname: string } } | null)
+      ?.from?.pathname;
+    return <Navigate to={pickReturnPath(fromPath)} replace />;
   }
 
   return <Landing />;
