@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { Routes, Route } from 'react-router-dom';
 import { renderWithProviders } from '../test/render';
 import { Login } from './Login';
+import { PublicOnlyRoute } from '../auth/PublicOnlyRoute';
 import { AUTH_TOKEN_KEY } from '../api/client';
 
 // ---------------------------------------------------------------------------
@@ -46,7 +47,7 @@ function LoginTree() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<div>Home page</div>} />
+      <Route path="/dashboard" element={<div>Home page</div>} />
       <Route path="/register" element={<div>Register page</div>} />
     </Routes>
   );
@@ -162,8 +163,8 @@ describe('Login wrong password (VAL-FE-AUTH-003)', () => {
 // Successful login (VAL-FE-AUTH-004)
 // ---------------------------------------------------------------------------
 
-describe('Login success (VAL-FE-AUTH-004)', () => {
-  it('stores JWT and redirects to /', async () => {
+describe('Login success (VAL-FE-AUTH-004 / VAL-ROUTING-003)', () => {
+  it('stores JWT and redirects to /dashboard', async () => {
     const user = userEvent.setup();
     const { server } = await import('../test/server');
     server.use(loginSuccessHandler());
@@ -176,7 +177,7 @@ describe('Login success (VAL-FE-AUTH-004)', () => {
     await user.type(screen.getByLabelText(/password/i), PASSWORD);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    // Redirected to /.
+    // Redirected to /dashboard.
     await waitFor(() => {
       expect(screen.getByText('Home page')).toBeInTheDocument();
     });
@@ -184,7 +185,7 @@ describe('Login success (VAL-FE-AUTH-004)', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe(TOKEN);
   });
 
-  it('returns to the originally-requested path after login (VAL-FE-AUTH-009)', async () => {
+  it('returns to the originally-requested path after login (VAL-FE-AUTH-009 / VAL-ROUTING-005)', async () => {
     const user = userEvent.setup();
     const { server } = await import('../test/server');
     server.use(loginSuccessHandler());
@@ -194,7 +195,7 @@ describe('Login success (VAL-FE-AUTH-004)', () => {
     renderWithProviders(
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<div>Home page</div>} />
+        <Route path="/dashboard" element={<div>Home page</div>} />
         <Route path="/eonet" element={<div>EONET page</div>} />
       </Routes>,
       {
@@ -214,11 +215,102 @@ describe('Login success (VAL-FE-AUTH-004)', () => {
     await user.type(screen.getByLabelText(/password/i), PASSWORD);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    // Returns to the originally-requested /eonet, not /.
+    // Returns to the originally-requested /eonet, not /dashboard.
     await waitFor(() => {
       expect(screen.getByText('EONET page')).toBeInTheDocument();
     });
     expect(screen.queryByText('Home page')).not.toBeInTheDocument();
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe(TOKEN);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: <Login> INSIDE <PublicOnlyRoute> (VAL-ROUTING-005 regression)
+// ---------------------------------------------------------------------------
+//
+// Login.test.tsx passes in isolation because it renders <Login> WITHOUT the
+// <PublicOnlyRoute> wrapper. In the live app, /login is wrapped by
+// <PublicOnlyRoute>, which (prior to the fix) hardcoded
+// `<Navigate to="/dashboard">` as soon as `useAuth().user` became non-null
+// after `AuthProvider.login()` called `setUser()`. That race overrode
+// Login.tsx's `navigate(from || '/dashboard')` and stranded the user on
+// /dashboard instead of returning them to the deep-linked route. This test
+// renders the real wrapper stack so the regression is caught by the unit
+// suite going forward.
+
+describe('Login deep-link return through PublicOnlyRoute (VAL-ROUTING-005)', () => {
+  it('returns to /eonet after a real login when location.state.from=/eonet', async () => {
+    const user = userEvent.setup();
+    const { server } = await import('../test/server');
+    server.use(loginSuccessHandler());
+
+    function AppTree() {
+      return (
+        <Routes>
+          <Route element={<PublicOnlyRoute />}>
+            <Route path="/login" element={<Login />} />
+          </Route>
+          <Route path="/dashboard" element={<div>Home page</div>} />
+          <Route path="/eonet" element={<div>EONET page</div>} />
+        </Routes>
+      );
+    }
+
+    renderWithProviders(<AppTree />, {
+      routerProps: {
+        initialEntries: [
+          {
+            pathname: '/login',
+            state: { from: { pathname: '/eonet' } },
+          },
+        ],
+        initialIndex: 0,
+      },
+    });
+
+    await user.type(screen.getByLabelText(/email/i), EMAIL);
+    await user.type(screen.getByLabelText(/password/i), PASSWORD);
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    // The PublicOnlyRoute wrapper must NOT override the return path: the
+    // user lands on /eonet, not /dashboard.
+    await waitFor(() => {
+      expect(screen.getByText('EONET page')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Home page')).not.toBeInTheDocument();
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe(TOKEN);
+  });
+
+  it('still lands on /dashboard after login when no deep-link from is present', async () => {
+    const user = userEvent.setup();
+    const { server } = await import('../test/server');
+    server.use(loginSuccessHandler());
+
+    function AppTree() {
+      return (
+        <Routes>
+          <Route element={<PublicOnlyRoute />}>
+            <Route path="/login" element={<Login />} />
+          </Route>
+          <Route path="/dashboard" element={<div>Home page</div>} />
+          <Route path="/eonet" element={<div>EONET page</div>} />
+        </Routes>
+      );
+    }
+
+    renderWithProviders(<AppTree />, {
+      routerProps: { initialEntries: ['/login'], initialIndex: 0 },
+    });
+
+    await user.type(screen.getByLabelText(/email/i), EMAIL);
+    await user.type(screen.getByLabelText(/password/i), PASSWORD);
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    // No deep-link → default to /dashboard.
+    await waitFor(() => {
+      expect(screen.getByText('Home page')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('EONET page')).not.toBeInTheDocument();
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe(TOKEN);
   });
 });

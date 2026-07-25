@@ -83,16 +83,13 @@ export function EonetFeed() {
           {Array.from({ length: 6 }, (_, i) => (
             <div
               key={i}
-              className="h-8 w-28 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"
+              className="h-8 w-28 animate-pulse rounded-full bg-deep-space-lighter"
             />
           ))}
         </div>
         <div className="space-y-3">
           {Array.from({ length: 4 }, (_, i) => (
-            <div
-              key={i}
-              className="space-y-2 rounded-lg border border-gray-200 p-4 dark:border-gray-700"
-            >
+            <div key={i} className="card-cosmic space-y-2 p-4">
               <Skeleton rows={2} />
             </div>
           ))}
@@ -119,10 +116,10 @@ export function EonetFeed() {
   return (
     <div data-testid="eonet-feed">
       <header className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h1 className="font-display text-2xl font-bold text-star-white">
           EONET Feed
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted">
           Natural events tracked from NASA's EONET API.
         </p>
       </header>
@@ -134,14 +131,14 @@ export function EonetFeed() {
           className="mb-3 flex flex-wrap items-center gap-2"
           data-testid="eonet-active-filters"
         >
-          <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted">
             Active filters:
           </span>
           {category && (
             <button
               type="button"
               onClick={() => selectCategory(undefined)}
-              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200"
+              className="inline-flex items-center gap-1 rounded-full border border-nebula-purple/40 bg-nebula-purple/15 px-3 py-1 text-xs font-medium text-nebula-purple-soft hover:bg-nebula-purple/25"
               data-testid="eonet-active-filter"
               data-filter="category"
             >
@@ -153,7 +150,7 @@ export function EonetFeed() {
             <button
               type="button"
               onClick={() => selectStatus('all')}
-              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200"
+              className="inline-flex items-center gap-1 rounded-full border border-nebula-purple/40 bg-nebula-purple/15 px-3 py-1 text-xs font-medium text-nebula-purple-soft hover:bg-nebula-purple/25"
               data-testid="eonet-active-filter"
               data-filter="status"
             >
@@ -188,7 +185,7 @@ export function EonetFeed() {
         ))}
         {categoriesQuery.isPending && (
           <span
-            className="text-xs text-gray-400"
+            className="text-xs text-muted"
             data-testid="eonet-categories-loading"
           >
             Loading categories…
@@ -199,13 +196,13 @@ export function EonetFeed() {
             className="flex items-center gap-2"
             data-testid="eonet-categories-error"
           >
-            <span className="text-xs text-red-600 dark:text-red-400">
+            <span className="text-xs text-cosmic-error">
               Failed to load categories
             </span>
             <button
               type="button"
               onClick={() => categoriesQuery.refetch()}
-              className="rounded border border-red-300 px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
+              className="rounded border border-cosmic-error/50 px-2 py-0.5 text-xs font-medium text-cosmic-error hover:bg-cosmic-error/10"
               data-testid="eonet-categories-retry"
             >
               Retry
@@ -276,19 +273,19 @@ export function EonetFeed() {
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="eonet-prev"
           >
             ← Previous
           </button>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="text-sm text-muted">
             Page {page} of {totalPages}
           </span>
           <button
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="eonet-next"
           >
             Next →
@@ -325,8 +322,8 @@ function CategoryChip({
       data-testid="eonet-category-chip"
       className={
         active
-          ? 'rounded-full bg-blue-600 px-3 py-1 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-          : 'rounded-full border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+          ? 'rounded-full border border-nebula-purple bg-nebula-purple/20 px-3 py-1 text-sm font-medium text-star-white shadow-[0_0_0_1px_rgba(139,92,246,0.35)] focus:outline-none focus:ring-2 focus:ring-nebula-purple-soft'
+          : 'rounded-full border border-nebula-purple/30 bg-deep-space-darker/60 px-3 py-1 text-sm font-medium text-muted hover:border-nebula-purple/60 hover:text-star-white focus:outline-none focus:ring-2 focus:ring-nebula-purple-soft'
       }
       {...rest}
     >
@@ -352,8 +349,8 @@ function StatusPill({ label, active, onClick, ...rest }: StatusPillProps) {
       data-testid="eonet-status-pill"
       className={
         active
-          ? 'rounded-full bg-blue-600 px-3 py-1 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-          : 'rounded-full border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+          ? 'rounded-full border border-nebula-purple bg-nebula-purple/20 px-3 py-1 text-sm font-medium text-star-white shadow-[0_0_0_1px_rgba(139,92,246,0.35)] focus:outline-none focus:ring-2 focus:ring-nebula-purple-soft'
+          : 'rounded-full border border-nebula-purple/30 bg-deep-space-darker/60 px-3 py-1 text-sm font-medium text-muted hover:border-nebula-purple/60 hover:text-star-white focus:outline-none focus:ring-2 focus:ring-nebula-purple-soft'
       }
       {...rest}
     >
@@ -365,15 +362,12 @@ function StatusPill({ label, active, onClick, ...rest }: StatusPillProps) {
 function EonetEventCard({ event }: { event: EonetEvent }) {
   const isOpen = event.status === 'open';
   return (
-    <li
-      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
-      data-testid="eonet-event-card"
-    >
+    <li className="card-cosmic p-4" data-testid="eonet-event-card">
       <div className="flex items-start justify-between gap-3">
         {/* Title rendered as TEXT content — never dangerouslySetInnerHTML
             (architecture §6 security). */}
         <h2
-          className="truncate text-base font-semibold text-gray-900 dark:text-gray-100"
+          className="truncate text-base font-semibold text-star-white"
           title={event.title}
           data-testid="eonet-event-title"
         >
@@ -382,8 +376,8 @@ function EonetEventCard({ event }: { event: EonetEvent }) {
         <span
           className={
             isOpen
-              ? 'inline-flex shrink-0 items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200'
-              : 'inline-flex shrink-0 items-center rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-600 dark:text-gray-100'
+              ? 'inline-flex shrink-0 items-center rounded-full border border-cosmic-success/40 bg-cosmic-success/15 px-2.5 py-0.5 text-xs font-medium text-cosmic-success'
+              : 'inline-flex shrink-0 items-center rounded-full border border-muted/30 bg-deep-space-lighter px-2.5 py-0.5 text-xs font-medium text-muted'
           }
           data-testid="eonet-event-status"
         >
@@ -391,18 +385,18 @@ function EonetEventCard({ event }: { event: EonetEvent }) {
         </span>
       </div>
       {event.description && (
-        <p className="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
+        <p className="mt-2 line-clamp-2 text-sm text-muted">
           {event.description}
         </p>
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
         <span data-testid="eonet-event-id">{event.id}</span>
         {event.link && (
           <a
             href={event.link}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-blue-600 hover:text-blue-500 dark:text-blue-400"
+            className="text-nebula-purple-soft hover:text-star-white"
           >
             EONET page
           </a>

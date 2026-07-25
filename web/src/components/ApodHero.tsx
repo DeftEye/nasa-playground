@@ -45,7 +45,7 @@ export function ApodHero({ entry }: ApodHeroProps) {
       : entry.explanation;
 
   return (
-    <article className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <article className="card-cosmic overflow-hidden">
       {isVideo && hasEmbed ? (
         <div className="aspect-video w-full bg-black">
           <iframe
@@ -62,19 +62,19 @@ export function ApodHero({ entry }: ApodHeroProps) {
         // clear "Watch video" affordance to the source `url` instead of an
         // `<img>` whose src is a video page (which would be a broken image).
         // Opens in a new tab with `rel=noopener noreferrer` (VAL-FE-HOME-008).
-        <div className="flex aspect-video w-full items-center justify-center bg-black">
+        <div className="flex aspect-video w-full items-center justify-center bg-deep-space-darker">
           <a
             href={entry.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="btn-secondary"
             data-testid="apod-video-watch-link"
           >
             <span aria-hidden="true">▶</span> Watch video
           </a>
         </div>
       ) : (
-        <div className="flex items-center justify-center bg-black">
+        <div className="flex items-center justify-center bg-deep-space-darker">
           <img
             src={entry.url}
             alt={entry.title}
@@ -86,20 +86,20 @@ export function ApodHero({ entry }: ApodHeroProps) {
 
       <div className="p-6">
         <div className="flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <p className="text-xs uppercase tracking-wide text-muted">
             {entry.date}
           </p>
           {/* `truncate` keeps long titles on a single row with ellipsis
               instead of overflowing the viewport (VAL-FE-HOME-006). */}
           <h1
-            className="truncate text-2xl font-bold text-gray-900 dark:text-gray-100"
+            className="truncate text-2xl font-bold text-star-white"
             data-testid="apod-title"
             title={entry.title}
           >
             {entry.title}
           </h1>
           {entry.copyright && (
-            <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+            <p className="truncate text-sm text-muted">
               © {entry.copyright}
             </p>
           )}
@@ -111,7 +111,7 @@ export function ApodHero({ entry }: ApodHeroProps) {
             (VAL-FE-HOME-005). */}
         <div className="mt-4">
           <p
-            className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300"
+            className="whitespace-pre-wrap text-sm leading-relaxed text-star-white/80"
             data-testid="apod-explanation"
           >
             {visibleExplanation}
@@ -120,7 +120,7 @@ export function ApodHero({ entry }: ApodHeroProps) {
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              className="mt-2 text-sm font-medium text-nebula-purple-soft transition-colors hover:text-star-white focus:outline-none focus-visible:ring-2 focus-visible:ring-nebula-purple-soft"
               aria-expanded={expanded}
               data-testid="apod-explanation-toggle"
             >

@@ -24,7 +24,7 @@ function RegisterTree() {
   return (
     <Routes>
       <Route path="/register" element={<Register />} />
-      <Route path="/" element={<div>Home page</div>} />
+      <Route path="/dashboard" element={<div>Home page</div>} />
       <Route path="/login" element={<div>Login page</div>} />
     </Routes>
   );
@@ -167,8 +167,8 @@ describe('Register conflict (VAL-FE-AUTH-006)', () => {
 // Successful register (VAL-FE-AUTH-007)
 // ---------------------------------------------------------------------------
 
-describe('Register success (VAL-FE-AUTH-007)', () => {
-  it('POSTs register then login, stores JWT, and redirects to /', async () => {
+describe('Register success (VAL-FE-AUTH-007 / VAL-ROUTING-003)', () => {
+  it('POSTs register then login, stores JWT, and redirects to /dashboard', async () => {
     const user = userEvent.setup();
     const { counters, handlers } = makeCounters();
     const { server } = await import('../test/server');
@@ -182,7 +182,7 @@ describe('Register success (VAL-FE-AUTH-007)', () => {
     await user.type(screen.getByLabelText(/password/i), PASSWORD);
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
-    // Redirected to /.
+    // Redirected to /dashboard.
     await waitFor(() => {
       expect(screen.getByText('Home page')).toBeInTheDocument();
     });

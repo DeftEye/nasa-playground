@@ -7,7 +7,7 @@ A NestJS backend that polls NASA's Astronomy Picture of the Day (APOD) and EONET
 - **Backend**: NestJS 11 + TypeORM 0.3 + Postgres 17 + Passport.js + JWT + bcrypt
 - **Schedulers**: `@nestjs/schedule` (cron + interval)
 - **HTTP client**: Node built-in `http`/`https` with typed wrapper (no SDK dep)
-- **Frontend**: Vite 8 + React 19 + TS + Tailwind v4 (`@tailwindcss/vite`) + React Router 7 + TanStack Query + axios + MSW 2 + Vitest 4 + RTL 16 + react-globe.gl (three.js) + `@turf/boolean-point-in-polygon`
+- **Frontend**: Vite 8 + React 19 + TS + Tailwind v4 (`@tailwindcss/vite`, CSS-first `@theme`) + React Router 7 + TanStack Query + axios + MSW 2 + Vitest 4 + RTL 16 + react-globe.gl (three.js) + `@turf/boolean-point-in-polygon` + `@fontsource/space-grotesk` (display font)
 - **Monorepo**: single `package.json` at repo root; Vite workspace in `web/`
 
 ## Quick Start
@@ -64,6 +64,29 @@ npm run start:prod         # node dist/main — serves both API and FE on port 3
 In production, `synchronize` is disabled and the schema must be applied via migrations. On a fresh database, `npm run start:prod` will fail to boot if migrations have not run. `@nestjs/serve-static` mounts `web/dist` so the built frontend is served at `/` and the API at `/api/*` from a single Node process on port 3000. No CORS headers are emitted (same-origin).
 
 **SPA deep-link fallback:** the production stack serves the SPA shell for any non-`/api/*` GET that does not resolve to a static asset. Hard-navigating or refreshing a client-side route (for example `/apod/archive`, `/globe`, `/login`) returns the SPA `index.html` (200 `text/html`) so React Router renders the right page instead of a JSON 404. Unknown `/api/*` routes still return the standard Nest JSON 404.
+
+## Frontend
+
+A single dark "cosmic" theme is applied across the entire app: a deep-space gradient background plus starfield, nebula purple and indigo accents, coral/dune warm accents, and star-white text. Light mode was dropped, so the app is dark-theme only. The theme is defined in `web/src/index.css` using Tailwind v4 CSS-first `@theme` blocks plus `:root` CSS custom properties. Shared component primitives (`.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.card-cosmic`, `.input-cosmic`, `.field-error`, `.section-heading`) are reused by every page so the visual language stays consistent from the landing page through the authenticated app.
+
+### Routing
+
+- `/` is a **public** space-themed landing page (hero, CTAs, and feature highlights for APOD, EONET, and the 3D globe, plus a footer) shown before sign-in.
+- The authenticated app "Home" (today's Astronomy Picture of the Day) lives at `/dashboard`.
+- Authenticated users visiting `/`, `/login`, or `/register` are redirected to `/dashboard`.
+- Deep-link return through login is preserved: a guest who hits a protected client-side route (for example `/eonet`) is sent to `/login`, then returned to that route after successful sign-in.
+
+### Typography
+
+Headings use the **Space Grotesk** display font, loaded by the `@fontsource/space-grotesk` package. Body text stays on the system font stack.
+
+### Branding
+
+A custom cosmic favicon ships at `web/public/favicon.svg`, and the product title is **NASA Sky Tracker**.
+
+### Optional landing hero asset
+
+The landing hero renders a CSS cosmic gradient plus starfield as a fallback, and overlays any image found at `/landing-hero.jpg` (served from `web/public/landing-hero.jpg`). To show a custom hero image, drop a file at `web/public/landing-hero.jpg`. Its absence is expected and non-breaking; the page falls back to the pure gradient + starfield look automatically.
 
 ## Environment Variables
 
@@ -292,14 +315,17 @@ docker compose -f docker-compose.prod.yml down -v
     notifications/           Notification log, fan-out, Discord transport
   web/                       Vite + React + TS + Tailwind frontend
     src/
-      pages/                 Home, ApodArchive, EonetFeed, EonetGlobe, NotificationsLog, Subscribers, Login, Register
+      pages/                 Landing (public, at /), Home (dashboard, at /dashboard), ApodArchive, EonetFeed, EonetGlobe, NotificationsLog, Subscribers, Login, Register, NotFound
       components/            ApodHero, Skeleton, EmptyState, ErrorState, AppLayout, UserMenu
       components/globe/      GlobeView (react-globe.gl), GlobeFilterBar, GlobeErrorBoundary, WebGL guard
       auth/                  AuthProvider, ProtectedRoute, PublicOnlyRoute
       api/                   axios client + per-domain wrappers
       test/                  MSW server, render helpers, setup
+      index.css              Tailwind v4 CSS-first `@theme`, `:root` cosmic theme tokens, and shared component primitives
     public/
+      favicon.svg            Cosmic-themed favicon
       countries.geojson      Natural Earth 110m countries (bundled; client-side country resolution via @turf)
+      landing-hero.jpg       (optional) landing-page hero image; absence falls back to the CSS gradient + starfield in index.css
   docker-compose.yml         Postgres 17
   .env.example               Environment variable template
 ```

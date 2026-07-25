@@ -23,7 +23,7 @@ export function Skeleton({ rows = 3, className = '' }: SkeletonProps) {
       {Array.from({ length: rows }, (_, i) => (
         <div
           key={i}
-          className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700"
+          className="h-4 w-full rounded bg-nebula-purple/15"
         />
       ))}
       <span className="sr-only">Loading…</span>

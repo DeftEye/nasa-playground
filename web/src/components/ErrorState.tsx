@@ -24,12 +24,17 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div
-      className="flex flex-col items-center justify-center py-16 text-center"
+      className="card-cosmic mx-auto flex max-w-md flex-col items-center justify-center px-6 py-16 text-center"
       data-testid="error-state"
       role="alert"
     >
-      <div className="mb-3 text-4xl">⚠️</div>
-      <p className="text-lg font-medium text-red-600 dark:text-red-400">
+      <div
+        className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-cosmic-error/40 bg-cosmic-error/10 text-3xl"
+        aria-hidden="true"
+      >
+        ⚠️
+      </div>
+      <p className="font-display text-lg font-medium text-cosmic-error">
         {message}
       </p>
       {onRetry && (
@@ -37,7 +42,7 @@ export function ErrorState({
           type="button"
           onClick={onRetry}
           data-testid={retryTestId}
-          className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          className="btn-primary mt-5"
         >
           Retry
         </button>

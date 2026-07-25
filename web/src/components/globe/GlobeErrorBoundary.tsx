@@ -43,15 +43,15 @@ export class GlobeErrorBoundary extends Component<
         <div
           data-testid="globe-webgl-unavailable"
           role="status"
-          className="flex h-full w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-6 text-center dark:border-gray-700 dark:bg-gray-800"
+          className="flex h-full w-full items-center justify-center rounded-lg border border-nebula-purple/25 bg-deep-space-darker p-6 text-center"
         >
           <div>
             <div className="mb-2 text-3xl">🌐</div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <p className="text-sm font-medium text-star-white">
               {this.props.fallbackLabel ??
                 '3D globe is unavailable in this browser (WebGL is disabled or unsupported).'}
             </p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-muted">
               Filters and the event list below still work.
             </p>
           </div>

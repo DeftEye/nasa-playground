@@ -40,7 +40,7 @@ export function Home() {
 
   if (todayQuery.isPending) {
     return (
-      <div data-testid="home-skeleton" className="space-y-4">
+      <div data-testid="home-skeleton" className="card-cosmic space-y-4 p-6">
         <Skeleton rows={1} className="h-64 rounded-lg" />
         <Skeleton rows={4} />
       </div>
@@ -63,7 +63,7 @@ export function Home() {
             type="button"
             onClick={handleManualFetch}
             disabled={triggerMutation.isPending}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-primary"
             data-testid="home-trigger-fetch"
           >
             {triggerMutation.isPending ? 'Fetching…' : 'Fetch today’s picture'}

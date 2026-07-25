@@ -4,6 +4,13 @@ import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './auth/AuthProvider';
 import { router } from './App';
+
+// Space Grotesk — self-hosted display font for headings (M14 cosmic theme).
+// Imported here so the font files are bundled and available before the app
+// renders. Body keeps the system font stack (see index.css).
+import '@fontsource/space-grotesk/400.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/700.css';
 import './index.css';
 
 // TanStack Query client. Default staleTime of 60 s prevents refetch thrashing
