@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { Skeleton } from './Skeleton';
+import { AuthBootstrapSkeleton } from './ui/AuthBootstrapSkeleton';
 import { Landing } from '../pages/Landing';
 
 /**
@@ -40,13 +40,7 @@ export function RootRoute() {
   const location = useLocation();
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-deep-space-base">
-        <div className="w-full max-w-md p-8">
-          <Skeleton rows={4} />
-        </div>
-      </div>
-    );
+    return <AuthBootstrapSkeleton />;
   }
 
   if (user) {

@@ -272,7 +272,7 @@ h3 {
     color: var(--color-cosmic-error);
   }
 
-  /* Section heading — display font + faint nebula accent bar */
+  /* Section heading — display font */
   .section-heading {
     font-family: var(--font-display);
     color: var(--color-star-white);

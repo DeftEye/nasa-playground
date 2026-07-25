@@ -11,38 +11,13 @@ import { ApodArchive } from './pages/ApodArchive';
 import { EonetFeed } from './pages/EonetFeed';
 import { NotificationsLog } from './pages/NotificationsLog';
 import { Subscribers } from './pages/Subscribers';
+import { NotFound } from './pages/NotFound';
 import { Skeleton } from './components/Skeleton';
 
 // Lazy-load the /globe route so three.js + react-globe.gl (~595 KB gzip) stay
 // out of the initial app bundle (architecture §16.2 / VAL-GLOBE-027). The
 // chunk is only fetched on first navigation to /globe.
 const EonetGlobe = lazy(() => import('./pages/EonetGlobe'));
-
-/**
- * Placeholder page component for routes not yet implemented. Currently used
- * only for the catch-all 404 route.
- */
-function Placeholder({ label }: { label: string }) {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-deep-space-base px-4 text-center text-star-white">
-      <div
-        className="card-cosmic mx-auto flex max-w-md flex-col items-center px-6 py-16"
-        data-testid="not-found"
-      >
-        <div
-          className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-nebula-purple/40 bg-deep-space-darker/60 text-3xl"
-          aria-hidden="true"
-        >
-          🛰️
-        </div>
-        <h1 className="font-display text-2xl font-bold text-star-white">
-          NASA Sky Tracker
-        </h1>
-        <p className="mt-2 text-muted">{label}</p>
-      </div>
-    </div>
-  );
-}
 
 // Router created with createBrowserRouter per architecture §6.
 //
@@ -117,6 +92,6 @@ export const router = createBrowserRouter([
   },
   {
     path: '*',
-    element: <Placeholder label="Page not found" />,
+    element: <NotFound />,
   },
 ]);

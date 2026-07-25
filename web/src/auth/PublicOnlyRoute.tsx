@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Skeleton } from '../components/Skeleton';
+import { AuthBootstrapSkeleton } from '../components/ui/AuthBootstrapSkeleton';
 
 /**
  * PublicOnlyRoute — for `/login` and `/register`.
@@ -44,13 +44,7 @@ export function PublicOnlyRoute() {
   const location = useLocation();
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-deep-space-base">
-        <div className="w-full max-w-md p-8">
-          <Skeleton rows={4} />
-        </div>
-      </div>
-    );
+    return <AuthBootstrapSkeleton />;
   }
 
   if (user) {
