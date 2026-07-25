@@ -64,7 +64,7 @@ export function UserMenu() {
         <div
           role="menu"
           aria-label="User menu"
-          className="card-cosmic absolute right-0 mt-2 w-56 overflow-hidden"
+          className="card-cosmic absolute right-0 z-50 mt-2 w-56 overflow-hidden"
         >
           <div className="border-b border-nebula-purple/20 px-4 py-3">
             <p className="truncate text-sm font-medium text-star-white">
