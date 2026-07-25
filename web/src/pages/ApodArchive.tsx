@@ -223,12 +223,12 @@ function BackfillControl() {
   const isPending = status.kind === 'pending';
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex w-fit flex-col gap-1.5">
       <button
         type="button"
         onClick={handleBackfill}
         disabled={isPending}
-        className="inline-flex w-fit items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-primary"
         data-testid="apod-backfill-button"
         aria-busy={isPending}
       >
@@ -241,12 +241,12 @@ function BackfillControl() {
           data-testid="apod-backfill-status"
           className={
             status.kind === 'error'
-              ? 'text-sm text-red-600 dark:text-red-400'
+              ? 'text-sm text-cosmic-error'
               : status.kind === 'success'
-                ? 'text-sm text-green-600 dark:text-green-400'
+                ? 'text-sm text-cosmic-success'
                 : status.kind === 'mixed'
-                  ? 'text-sm text-amber-600 dark:text-amber-400'
-                  : 'text-sm text-gray-500 dark:text-gray-400'
+                  ? 'text-sm text-cosmic-warning'
+                  : 'text-sm text-muted'
           }
         >
           {status.kind === 'pending'
@@ -293,7 +293,7 @@ export function ApodArchive() {
           {Array.from({ length: 6 }, (_, i) => (
             <div
               key={i}
-              className="space-y-2 rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+              className="card-cosmic space-y-2 p-4"
             >
               <Skeleton rows={1} className="h-32" />
               <Skeleton rows={2} />
@@ -319,7 +319,7 @@ export function ApodArchive() {
     return (
       <div>
         <div className="mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="font-display text-2xl font-bold text-star-white">
             APOD Archive
           </h1>
         </div>
@@ -338,10 +338,10 @@ export function ApodArchive() {
       <header className="mb-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <h1 className="font-display text-2xl font-bold text-star-white">
               APOD Archive
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-muted">
               {total} {total === 1 ? 'entry' : 'entries'} · page {page} of{' '}
               {totalPages}
             </p>
@@ -358,7 +358,7 @@ export function ApodArchive() {
           return (
             <article
               key={entry.date}
-              className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+              className="card-cosmic overflow-hidden"
               data-testid="apod-archive-card"
             >
               {isVideo && hasEmbed ? (
@@ -374,19 +374,19 @@ export function ApodArchive() {
                 // Non-embeddable video: a "Watch video" link to the source
                 // `url` (new tab, `rel=noopener noreferrer`) instead of a
                 // broken `<img>` (VAL-FE-ARCHIVE-006).
-                <div className="flex aspect-video w-full items-center justify-center bg-black">
+                <div className="flex aspect-video w-full items-center justify-center bg-deep-space-darker">
                   <a
                     href={entry.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="btn-secondary"
                     data-testid="apod-archive-card-watch-link"
                   >
                     <span aria-hidden="true">▶</span> Watch video
                   </a>
                 </div>
               ) : (
-                <div className="aspect-video w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
+                <div className="aspect-video w-full overflow-hidden bg-deep-space-darker">
                   <img
                     src={entry.url}
                     alt={entry.title}
@@ -397,11 +397,11 @@ export function ApodArchive() {
                 </div>
               )}
               <div className="p-3">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <p className="text-xs uppercase tracking-wide text-muted">
                   {entry.date}
                 </p>
                 <p
-                  className="mt-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100"
+                  className="mt-1 truncate text-sm font-medium text-star-white"
                   title={entry.title}
                 >
                   {entry.title}
@@ -421,19 +421,19 @@ export function ApodArchive() {
           type="button"
           onClick={() => goToPage(page - 1)}
           disabled={page <= 1}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+          className="btn-secondary"
           data-testid="archive-prev"
         >
           ← Previous
         </button>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="text-sm text-muted">
           Page {page} of {totalPages}
         </span>
         <button
           type="button"
           onClick={() => goToPage(page + 1)}
           disabled={page >= totalPages}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+          className="btn-secondary"
           data-testid="archive-next"
         >
           Next →
