@@ -22,7 +22,7 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-deep-space-base text-star-white">
-      <header className="border-b border-nebula-purple/25 bg-deep-space-darker/80 backdrop-blur supports-[backdrop-filter]:bg-deep-space-darker/60">
+      <header className="relative z-50 border-b border-nebula-purple/25 bg-deep-space-darker/80 backdrop-blur supports-[backdrop-filter]:bg-deep-space-darker/60">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <Link
             to="/dashboard"
