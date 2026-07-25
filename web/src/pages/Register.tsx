@@ -12,7 +12,7 @@ import { useAuth } from '../auth/AuthContext';
  * On submit with valid fields:
  * 1. POST /api/auth/register (201 on success).
  * 2. POST /api/auth/login (auto-login) → store JWT.
- * 3. Redirect to `/` (VAL-FE-AUTH-007).
+ * 3. Redirect to `/dashboard` (VAL-FE-AUTH-007 / VAL-ROUTING-003).
  *
  * A 409/conflict from register surfaces as an inline error referencing the
  * conflict (VAL-FE-AUTH-006). The token never enters the URL
@@ -63,8 +63,9 @@ export function Register() {
     setSubmitting(true);
     try {
       await register(email.trim(), password);
-      // Register always redirects to `/` (architecture §6).
-      navigate('/', { replace: true });
+      // Register always redirects to `/dashboard` (architecture §6 /
+      // VAL-ROUTING-003).
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       const status =
         (err as { response?: { status?: number } }).response?.status ?? 0;

@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PublicOnlyRoute } from './auth/PublicOnlyRoute';
 import { AppLayout } from './components/AppLayout';
+import { RootRoute } from './components/RootRoute';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Home } from './pages/Home';
@@ -34,14 +35,24 @@ function Placeholder({ label }: { label: string }) {
 
 // Router created with createBrowserRouter per architecture §6.
 //
-// Route tree:
-// - Public-only routes (`/login`, `/register`) redirect to `/` if a session
-//   already exists (VAL-FE-AUTH-008).
-// - All other routes are guarded by `ProtectedRoute`, which redirects to
+// Route tree (M14 update):
+// - `/` is a PUBLIC route rendering the Landing page via `RootRoute`
+//   (OUTSIDE `ProtectedRoute`). Authenticated users hitting `/` are
+//   redirected to `/dashboard` (VAL-ROUTING-001, VAL-ROUTING-004).
+// - Public-only routes (`/login`, `/register`) redirect to `/dashboard` if
+//   a session already exists (VAL-FE-AUTH-008 / VAL-ROUTING-006).
+// - All app routes are guarded by `ProtectedRoute`, which redirects to
 //   `/login` (preserving the originally-requested path) when there is no
-//   session (VAL-FE-AUTH-009). The shared `AppLayout` (top nav + UserMenu
-//   with Logout) wraps the protected subtree (VAL-FE-AUTH-011).
+//   session (VAL-FE-AUTH-009 / VAL-ROUTING-002, 005). The shared
+//   `AppLayout` (top nav + UserMenu with Logout) wraps the protected
+//   subtree (VAL-FE-AUTH-011). The app Home (today's APOD) lives at
+//   `/dashboard` (VAL-ROUTING-001).
+// - The `*` 404 catch-all is preserved.
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <RootRoute />,
+  },
   {
     element: <PublicOnlyRoute />,
     children: [
@@ -56,7 +67,7 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           {
-            path: '/',
+            path: '/dashboard',
             element: <Home />,
           },
           {

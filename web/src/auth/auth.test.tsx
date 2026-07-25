@@ -8,6 +8,8 @@ import { useAuth } from './AuthContext';
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicOnlyRoute } from './PublicOnlyRoute';
 import { AppLayout } from '../components/AppLayout';
+import { RootRoute } from '../components/RootRoute';
+import { Landing } from '../pages/Landing';
 import { AUTH_TOKEN_KEY } from '../api/client';
 
 // ---------------------------------------------------------------------------
@@ -54,7 +56,7 @@ function AppTree() {
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<ProtectedChild />} />
+          <Route path="/dashboard" element={<ProtectedChild />} />
           <Route path="/eonet" element={<ProtectedChild />} />
         </Route>
       </Route>
@@ -167,7 +169,7 @@ describe('ProtectedRoute', () => {
     server.use(meHandler());
 
     renderWithProviders(<AppTree />, {
-      routerProps: { initialEntries: ['/'], initialIndex: 0 },
+      routerProps: { initialEntries: ['/dashboard'], initialIndex: 0 },
     });
 
     await waitFor(() => {
@@ -178,11 +180,88 @@ describe('ProtectedRoute', () => {
 });
 
 // ---------------------------------------------------------------------------
+// RootRoute — public `/` landing + authed redirect to /dashboard
+// (VAL-ROUTING-001, VAL-ROUTING-004)
+// ---------------------------------------------------------------------------
+
+describe('RootRoute (VAL-ROUTING-001, VAL-ROUTING-004)', () => {
+  it('renders the public Landing for an unauthenticated visit to /', async () => {
+    function RootTree() {
+      return (
+        <Routes>
+          <Route path="/" element={<RootRoute />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<div>Dashboard page</div>} />
+            </Route>
+          </Route>
+          <Route element={<PublicOnlyRoute />}>
+            <Route path="/login" element={<div>Login page</div>} />
+          </Route>
+        </Routes>
+      );
+    }
+    renderWithProviders(<RootTree />, {
+      routerProps: { initialEntries: ['/'], initialIndex: 0 },
+    });
+
+    // The public Landing renders (not the dashboard, not /login).
+    await waitFor(() => {
+      expect(screen.getByTestId('landing-hero')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute(
+      'href',
+      '/login',
+    );
+    expect(
+      screen.getByRole('link', { name: /create account/i }),
+    ).toHaveAttribute('href', '/register');
+    expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument();
+    expect(screen.queryByText('Login page')).not.toBeInTheDocument();
+  });
+
+  it('redirects an authenticated visit to / to /dashboard', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
+    const { server } = await import('../test/server');
+    server.use(meHandler());
+
+    function RootTree() {
+      return (
+        <Routes>
+          <Route path="/" element={<RootRoute />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<div>Dashboard page</div>} />
+            </Route>
+          </Route>
+        </Routes>
+      );
+    }
+    renderWithProviders(<RootTree />, {
+      routerProps: { initialEntries: ['/'], initialIndex: 0 },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard page')).toBeInTheDocument();
+    });
+    // The public Landing did NOT render for the authed visitor.
+    expect(screen.queryByTestId('landing-hero')).not.toBeInTheDocument();
+  });
+
+  it('Landing is exported and renders the hero surface', () => {
+    // Sanity: the Landing component itself is public and renders without an
+    // auth provider-driven redirect (it is a pure presentational surface).
+    renderWithProviders(<Landing />);
+    expect(screen.getByTestId('landing-hero')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // PublicOnlyRoute (VAL-FE-AUTH-008)
 // ---------------------------------------------------------------------------
 
-describe('PublicOnlyRoute (VAL-FE-AUTH-008)', () => {
-  it('redirects authenticated users from /login to /', async () => {
+describe('PublicOnlyRoute (VAL-FE-AUTH-008 / VAL-ROUTING-006)', () => {
+  it('redirects authenticated users from /login to /dashboard', async () => {
     localStorage.setItem(AUTH_TOKEN_KEY, TOKEN);
     const { server } = await import('../test/server');
     server.use(meHandler());
@@ -195,7 +274,7 @@ describe('PublicOnlyRoute (VAL-FE-AUTH-008)', () => {
           </Route>
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route path="/" element={<div>Home</div>} />
+              <Route path="/dashboard" element={<div>Home</div>} />
             </Route>
           </Route>
         </Routes>

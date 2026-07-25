@@ -14,7 +14,8 @@ import { useAuth } from '../auth/AuthContext';
  * single inline error (no toast spam — VAL-FE-AUTH-003). On success, the
  * JWT is stored by AuthProvider and the browser navigates to the
  * originally-requested path (preserved by ProtectedRoute in
- * `location.state.from`) or `/` (VAL-FE-AUTH-004, 009).
+ * `location.state.from`) or `/dashboard` (VAL-FE-AUTH-004, 009 /
+ * VAL-ROUTING-003, 005).
  *
  * The token is never placed in the URL (VAL-FE-AUTH-012).
  */
@@ -69,9 +70,9 @@ export function Login() {
     setSubmitting(true);
     try {
       await login(email.trim(), password);
-      // Navigate to the originally-requested path or `/`. `replace` so the
-      // `/login` entry isn't left in history (clean back button).
-      navigate(from && from !== '/login' ? from : '/', { replace: true });
+      // Navigate to the originally-requested path or `/dashboard`. `replace`
+      // so the `/login` entry isn't left in history (clean back button).
+      navigate(from && from !== '/login' ? from : '/dashboard', { replace: true });
     } catch (err) {
       const status =
         (err as { response?: { status?: number } }).response?.status ?? 0;

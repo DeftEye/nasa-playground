@@ -46,7 +46,7 @@ function LoginTree() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<div>Home page</div>} />
+      <Route path="/dashboard" element={<div>Home page</div>} />
       <Route path="/register" element={<div>Register page</div>} />
     </Routes>
   );
@@ -162,8 +162,8 @@ describe('Login wrong password (VAL-FE-AUTH-003)', () => {
 // Successful login (VAL-FE-AUTH-004)
 // ---------------------------------------------------------------------------
 
-describe('Login success (VAL-FE-AUTH-004)', () => {
-  it('stores JWT and redirects to /', async () => {
+describe('Login success (VAL-FE-AUTH-004 / VAL-ROUTING-003)', () => {
+  it('stores JWT and redirects to /dashboard', async () => {
     const user = userEvent.setup();
     const { server } = await import('../test/server');
     server.use(loginSuccessHandler());
@@ -176,7 +176,7 @@ describe('Login success (VAL-FE-AUTH-004)', () => {
     await user.type(screen.getByLabelText(/password/i), PASSWORD);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    // Redirected to /.
+    // Redirected to /dashboard.
     await waitFor(() => {
       expect(screen.getByText('Home page')).toBeInTheDocument();
     });
@@ -184,7 +184,7 @@ describe('Login success (VAL-FE-AUTH-004)', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe(TOKEN);
   });
 
-  it('returns to the originally-requested path after login (VAL-FE-AUTH-009)', async () => {
+  it('returns to the originally-requested path after login (VAL-FE-AUTH-009 / VAL-ROUTING-005)', async () => {
     const user = userEvent.setup();
     const { server } = await import('../test/server');
     server.use(loginSuccessHandler());
@@ -194,7 +194,7 @@ describe('Login success (VAL-FE-AUTH-004)', () => {
     renderWithProviders(
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<div>Home page</div>} />
+        <Route path="/dashboard" element={<div>Home page</div>} />
         <Route path="/eonet" element={<div>EONET page</div>} />
       </Routes>,
       {
@@ -214,7 +214,7 @@ describe('Login success (VAL-FE-AUTH-004)', () => {
     await user.type(screen.getByLabelText(/password/i), PASSWORD);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    // Returns to the originally-requested /eonet, not /.
+    // Returns to the originally-requested /eonet, not /dashboard.
     await waitFor(() => {
       expect(screen.getByText('EONET page')).toBeInTheDocument();
     });
