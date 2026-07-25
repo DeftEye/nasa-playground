@@ -26,22 +26,23 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div
-      className="flex flex-col items-center justify-center py-16 text-center"
+      className="card-cosmic mx-auto flex max-w-md flex-col items-center justify-center px-6 py-16 text-center"
       data-testid="empty-state"
       data-variant={variant}
     >
-      <div className="mb-3 text-4xl">
+      <div
+        className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-nebula-purple/40 bg-deep-space-darker/60 text-3xl"
+        aria-hidden="true"
+      >
         {variant === 'zero' ? '📭' : '🔍'}
       </div>
-      <p className="text-lg font-medium text-gray-700 dark:text-gray-200">
+      <p className="font-display text-lg font-medium text-star-white">
         {message}
       </p>
       {description && (
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {description}
-        </p>
+        <p className="mt-2 text-sm text-muted">{description}</p>
       )}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
