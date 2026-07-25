@@ -1,17 +1,82 @@
 @import 'tailwindcss';
 
-/* Global base styles. Tailwind v4 CSS-first configuration: no
- * tailwind.config.js is needed. The @tailwindcss/vite plugin processes this
- * file at build time (architecture §6).
- */
+/* =========================================================================
+ * Cosmic design-system foundation (M14+)
+ * -------------------------------------------------------------------------
+ * Tailwind v4 CSS-first configuration: NO tailwind.config.js. The
+ * @tailwindcss/vite plugin processes this file at build time.
+ *
+ * Single dark "cosmic" theme (light mode dropped). Tokens are exposed both
+ * as CSS custom properties (in :root) and as Tailwind v4 `@theme` color
+ * tokens so utilities like `bg-deep-space-base`, `text-star-white`,
+ * `text-nebula-purple` etc. are available throughout the app.
+ *
+ * Token reference: see library/design-system.md (the persistent source of
+ * truth for the redesign).
+ * ======================================================================= */
+
+@theme {
+  /* Deep-space background — base + darker/lighter layering pair */
+  --color-deep-space-darker: #04040c;
+  --color-deep-space-base: #0a0a1a;
+  --color-deep-space-lighter: #141432;
+
+  /* Nebula purple / indigo — primary accents */
+  --color-nebula-purple: #8b5cf6;
+  --color-nebula-indigo: #6366f1;
+  --color-nebula-purple-soft: #a78bfa;
+
+  /* Coral / dune — warm secondary accent (from the reference art dunes) */
+  --color-coral: #ff7a59;
+  --color-dune: #e8c39e;
+
+  /* Foreground text */
+  --color-star-white: #f5f5fa;
+  --color-muted: #9ca3c4;
+
+  /* Semantic — tuned for a dark theme */
+  --color-cosmic-success: #4ade80;
+  --color-cosmic-error: #f87171;
+  --color-cosmic-warning: #fbbf24;
+
+  /* Display font for headings (Space Grotesk, self-hosted via @fontsource) */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+}
 
 :root {
-  color-scheme: light dark;
+  /* Re-expose the same palette as plain CSS custom properties so non-Tailwind
+   * CSS (e.g. the global background below) and downstream styles can consume
+   * the canonical token values without going through Tailwind utilities. */
+  --color-deep-space-darker: #04040c;
+  --color-deep-space-base: #0a0a1a;
+  --color-deep-space-lighter: #141432;
+
+  --color-nebula-purple: #8b5cf6;
+  --color-nebula-indigo: #6366f1;
+  --color-nebula-purple-soft: #a78bfa;
+
+  --color-coral: #ff7a59;
+  --color-dune: #e8c39e;
+
+  --color-star-white: #f5f5fa;
+  --color-muted: #9ca3c4;
+
+  --color-cosmic-success: #4ade80;
+  --color-cosmic-error: #f87171;
+  --color-cosmic-warning: #fbbf24;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+
+  /* Single dark theme — drop the light/dark duality. */
+  color-scheme: dark;
 }
+
+/* ---- Global cosmic background on body/#root --------------------------- */
 
 body {
   margin: 0;
   min-height: 100vh;
+  color: var(--color-star-white);
   font-family:
     system-ui,
     -apple-system,
@@ -23,8 +88,196 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Deep-space vertical gradient (darker at top, lighter mid, darker bottom)
+   * layered with a subtle CSS starfield of tiny static pinpoints. The
+   * starfield uses multiple radial-gradients at fixed positions so it stays
+   * cheap and never reflows. */
+  background-color: var(--color-deep-space-base);
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.85) 50%, transparent 51%),
+    radial-gradient(1px 1px at 28% 72%, rgba(255, 255, 255, 0.6) 50%, transparent 51%),
+    radial-gradient(1px 1px at 47% 33%, rgba(255, 255, 255, 0.75) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 63% 58%, rgba(255, 255, 255, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 22%, rgba(255, 255, 255, 0.7) 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 80%, rgba(255, 255, 255, 0.55) 50%, transparent 51%),
+    radial-gradient(1px 1px at 35% 88%, rgba(255, 255, 255, 0.65) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 55% 12%, rgba(255, 255, 255, 0.45) 50%, transparent 51%),
+    radial-gradient(1px 1px at 70% 45%, rgba(255, 255, 255, 0.6) 50%, transparent 51%),
+    radial-gradient(
+      180deg,
+      var(--color-deep-space-darker) 0%,
+      var(--color-deep-space-base) 35%,
+      var(--color-deep-space-lighter) 60%,
+      var(--color-deep-space-base) 100%
+    );
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 #root {
   min-height: 100vh;
+  color: var(--color-star-white);
+}
+
+/* ---- Display font on headings (Space Grotesk) ------------------------ */
+/* Body keeps the system font stack (see `body` above). Only headings pick
+ * up the display font. This is the foundation that all surfaces inherit. */
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  color: var(--color-star-white);
+  letter-spacing: -0.01em;
+}
+
+/* ---- Shared cosmic UI primitives (@layer components) ------------------ */
+/* Small, reusable utility classes used across the redesign. They live in
+ * `@layer components` so Tailwind utilities can still override them when a
+ * page needs a one-off tweak. See library/design-system.md for usage. */
+
+@layer components {
+  /* Button — primary (nebula accent) */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    background-image: linear-gradient(
+      135deg,
+      var(--color-nebula-indigo),
+      var(--color-nebula-purple)
+    );
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-star-white);
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.35),
+      0 8px 24px -12px rgba(99, 102, 241, 0.55);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.55),
+      0 12px 28px -10px rgba(99, 102, 241, 0.7);
+  }
+  .btn-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+  }
+  .btn-primary:focus-visible {
+    outline: 2px solid var(--color-nebula-purple-soft);
+    outline-offset: 2px;
+  }
+
+  /* Button — secondary (subtle bordered) */
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(167, 139, 250, 0.4);
+    background-color: rgba(20, 20, 50, 0.6);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-star-white);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+  .btn-secondary:hover {
+    border-color: rgba(167, 139, 250, 0.8);
+    background-color: rgba(30, 30, 70, 0.7);
+  }
+  .btn-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .btn-secondary:focus-visible {
+    outline: 2px solid var(--color-nebula-purple-soft);
+    outline-offset: 2px;
+  }
+
+  /* Button — ghost (no border, subtle hover) */
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    background-color: transparent;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+  .btn-ghost:hover {
+    color: var(--color-star-white);
+    background-color: rgba(139, 92, 246, 0.12);
+  }
+  .btn-ghost:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .btn-ghost:focus-visible {
+    outline: 2px solid var(--color-nebula-purple-soft);
+    outline-offset: 2px;
+  }
+
+  /* Card / Panel — glassy, subtle border + nebula glow */
+  .card-cosmic {
+    border-radius: 0.75rem;
+    border: 1px solid rgba(139, 92, 246, 0.22);
+    background-color: rgba(10, 10, 26, 0.6);
+    backdrop-filter: blur(10px);
+    box-shadow:
+      0 0 0 1px rgba(99, 102, 241, 0.05) inset,
+      0 18px 40px -24px rgba(99, 102, 241, 0.5);
+  }
+
+  /* Input / form field */
+  .input-cosmic {
+    display: block;
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(167, 139, 250, 0.3);
+    background-color: rgba(4, 4, 12, 0.7);
+    padding: 0.5rem 0.75rem;
+    color: var(--color-star-white);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input-cosmic::placeholder {
+    color: rgba(156, 163, 196, 0.6);
+  }
+  .input-cosmic:focus {
+    border-color: var(--color-nebula-purple);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+  }
+  .input-cosmic[aria-invalid='true'] {
+    border-color: var(--color-cosmic-error);
+  }
+
+  /* Inline error text for form fields */
+  .field-error {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--color-cosmic-error);
+  }
+
+  /* Section heading — display font + faint nebula accent bar */
+  .section-heading {
+    font-family: var(--font-display);
+    color: var(--color-star-white);
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
 }

@@ -56,7 +56,7 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="User menu"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-nebula-indigo to-nebula-purple text-sm font-semibold text-star-white shadow-[0_0_0_1px_rgba(139,92,246,0.35)] hover:from-nebula-purple hover:to-nebula-indigo focus:outline-none focus:ring-2 focus:ring-nebula-purple-soft"
       >
         {initial}
       </button>
@@ -64,10 +64,10 @@ export function UserMenu() {
         <div
           role="menu"
           aria-label="User menu"
-          className="absolute right-0 mt-2 w-56 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+          className="card-cosmic absolute right-0 mt-2 w-56 overflow-hidden"
         >
-          <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
-            <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+          <div className="border-b border-nebula-purple/20 px-4 py-3">
+            <p className="truncate text-sm font-medium text-star-white">
               {user.email}
             </p>
           </div>
@@ -75,7 +75,7 @@ export function UserMenu() {
             type="button"
             role="menuitem"
             onClick={handleLogout}
-            className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="block w-full px-4 py-2 text-left text-sm text-muted hover:bg-nebula-purple/15 hover:text-star-white"
           >
             Logout
           </button>
