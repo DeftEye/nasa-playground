@@ -196,10 +196,10 @@ export function EonetGlobe() {
   return (
     <div data-testid="globe-page" className="space-y-4">
       <header className="mb-2">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h1 className="font-display text-2xl font-bold text-star-white">
           EONET Globe
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted">
           Explore natural events from NASA's EONET on a 3D globe. Hover a point
           for its title, click a country to see its events.
         </p>
@@ -215,11 +215,11 @@ export function EonetGlobe() {
 
       {/* Selected country indicator — always rendered; reads `none` before
           selection (VAL-COUNTRY-001). */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+      <div className="flex items-center gap-2 text-sm text-muted">
         Selected country:{' '}
         <span
           data-testid="globe-selected-country"
-          className="font-semibold text-gray-900 dark:text-gray-100"
+          className="font-semibold text-star-white"
         >
           {selectedCountryName}
         </span>
@@ -228,10 +228,7 @@ export function EonetGlobe() {
       {/* Loading skeleton (VAL-GLOBE-018). Dedicated `globe-skeleton` testid
           in addition to the shared Skeleton. */}
       {mapQuery.isPending && (
-        <div
-          data-testid="globe-skeleton"
-          className="rounded-lg border border-gray-200 p-6 dark:border-gray-700"
-        >
+        <div data-testid="globe-skeleton" className="card-cosmic p-6">
           <Skeleton rows={4} />
         </div>
       )}
@@ -253,8 +250,10 @@ export function EonetGlobe() {
       {mapQuery.data && (
         <>
           {/* Globe area: canvas when WebGL is up, fallback when it is not.
-              The DOM mirror below renders regardless of WebGL state. */}
-          <div className="h-[520px] w-full overflow-hidden rounded-lg border border-gray-200 bg-gradient-to-b from-sky-50 to-white dark:border-gray-700 dark:from-gray-900 dark:to-gray-800">
+              The DOM mirror below renders regardless of WebGL state.
+              Container styling only — the react-globe.gl canvas internals
+              live inside GlobeView and are NOT modified here. */}
+          <div className="h-[520px] w-full overflow-hidden rounded-lg border border-nebula-purple/25 bg-gradient-to-b from-deep-space-darker to-deep-space-base">
             {webglOk ? (
               <GlobeErrorBoundary>
                 <GlobeView
@@ -273,11 +272,11 @@ export function EonetGlobe() {
               >
                 <div>
                   <div className="mb-2 text-3xl">🌐</div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <p className="text-sm font-medium text-star-white">
                     3D globe is unavailable in this browser (WebGL is disabled
                     or unsupported).
                   </p>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-muted">
                     The event list and country side panel still work.
                   </p>
                 </div>
@@ -287,11 +286,11 @@ export function EonetGlobe() {
 
           {/* Event count (VAL-GLOBE-009). */}
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-muted">
               Plotted events:{' '}
               <span
                 data-testid="globe-events-count"
-                className="font-semibold text-gray-900 dark:text-gray-100"
+                className="font-semibold text-star-white"
               >
                 {events.length}
               </span>
@@ -320,7 +319,7 @@ export function EonetGlobe() {
               detail (VAL-COUNTRY-008 / VAL-GCROSS-010). */}
           {events.length > 0 && (
             <ul
-              className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2 dark:border-gray-700"
+              className="card-cosmic max-h-72 space-y-1 overflow-y-auto p-2"
               aria-label="Plotted EONET events"
             >
               {events.map((e) => {
@@ -334,7 +333,7 @@ export function EonetGlobe() {
                     data-status={e.status}
                     data-title={e.title}
                     onClick={() => setSelectedEvent(e)}
-                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-deep-space-lighter"
                   >
                     <span
                       className="inline-block h-3 w-3 shrink-0 rounded-full"
@@ -342,10 +341,10 @@ export function EonetGlobe() {
                       aria-hidden
                     />
                     {/* Title rendered as TEXT content (XSS-safe). */}
-                    <span className="truncate text-gray-900 dark:text-gray-100">
+                    <span className="truncate text-star-white">
                       {e.title}
                     </span>
-                    <span className="ml-auto shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="ml-auto shrink-0 text-xs text-muted">
                       {e.status}
                     </span>
                   </li>
@@ -361,11 +360,11 @@ export function EonetGlobe() {
           {selectedFeature && (
             <aside
               data-testid="globe-side-panel"
-              className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+              className="card-cosmic p-4"
               aria-label={`Events in ${selectedCountryName}`}
             >
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <h2 className="text-lg font-semibold text-star-white">
                   {selectedCountryName}
                 </h2>
                 <button
@@ -373,17 +372,17 @@ export function EonetGlobe() {
                   data-testid="globe-side-panel-close"
                   onClick={closeSidePanel}
                   aria-label={`Close ${selectedCountryName} panel`}
-                  className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+                  className="rounded-md px-2 py-1 text-sm text-muted hover:bg-deep-space-lighter hover:text-star-white"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+              <div className="mb-2 text-sm text-muted">
                 Events in this country:{' '}
                 <span
                   data-testid="globe-country-events-count"
-                  className="font-semibold text-gray-900 dark:text-gray-100"
+                  className="font-semibold text-star-white"
                 >
                   {countryEvents.length}
                 </span>
@@ -405,17 +404,17 @@ export function EonetGlobe() {
                         data-category={firstCategory}
                         data-status={e.status}
                         onClick={() => setSelectedEvent(e)}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-deep-space-lighter"
                       >
                         <span
                           className="inline-block h-3 w-3 shrink-0 rounded-full"
                           style={{ backgroundColor: categoryColor(firstCategory) }}
                           aria-hidden
                         />
-                        <span className="truncate text-gray-900 dark:text-gray-100">
+                        <span className="truncate text-star-white">
                           {e.title}
                         </span>
-                        <span className="ml-auto shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="ml-auto shrink-0 text-xs text-muted">
                           {e.status}
                         </span>
                       </li>
@@ -443,12 +442,12 @@ export function EonetGlobe() {
           {selectedEvent && (
             <div
               data-testid="globe-event-detail"
-              className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+              className="card-cosmic p-4"
               role="dialog"
               aria-label={`Event detail: ${selectedEvent.title}`}
             >
               <div className="mb-2 flex items-start justify-between gap-3">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className="text-base font-semibold text-star-white">
                   {/* Title rendered as TEXT content (XSS-safe). */}
                   {selectedEvent.title}
                 </h3>
@@ -457,20 +456,20 @@ export function EonetGlobe() {
                   data-testid="globe-event-detail-close"
                   onClick={() => setSelectedEvent(undefined)}
                   aria-label="Close event detail"
-                  className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+                  className="rounded-md px-2 py-1 text-sm text-muted hover:bg-deep-space-lighter hover:text-star-white"
                 >
                   ✕
                 </button>
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">
+              <div className="text-sm text-muted">
                 <p>
                   Status:{' '}
-                  <span className="font-medium">{selectedEvent.status}</span>
+                  <span className="font-medium text-star-white">{selectedEvent.status}</span>
                 </p>
                 {selectedEvent.categories && selectedEvent.categories.length > 0 && (
                   <p>
                     Categories:{' '}
-                    <span className="font-medium">
+                    <span className="font-medium text-star-white">
                       {selectedEvent.categories.map((c) => c.title).join(', ')}
                     </span>
                   </p>
@@ -493,7 +492,7 @@ export function EonetGlobe() {
                         href={link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                        className="font-medium text-nebula-purple-soft hover:text-star-white hover:underline"
                       >
                         Open on NASA EONET ↗
                       </a>
@@ -501,7 +500,7 @@ export function EonetGlobe() {
                       <span
                         data-testid="globe-event-link"
                         aria-disabled="true"
-                        className="font-medium text-gray-400 dark:text-gray-500"
+                        className="font-medium text-muted"
                       >
                         Open on NASA EONET ↗
                       </span>
@@ -563,18 +562,18 @@ interface GlobeFilterBarProps {
 function GlobeFilterBar({ filters, categories, onChange }: GlobeFilterBarProps) {
   return (
     <div
-      className="flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
+      className="card-cosmic flex flex-wrap items-end gap-4 p-3"
       data-testid="globe-filter-bar"
     >
       {/* Category select — 'all' + one option per category slug
           (VAL-GLOBE-010). */}
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+      <label className="flex flex-col gap-1 text-xs font-medium text-muted">
         Category
         <select
           data-testid="globe-filter-category"
           value={filters.category}
           onChange={(e) => onChange({ category: e.target.value })}
-          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          className="input-cosmic w-auto px-2 py-1 text-sm"
         >
           <option value="all">All categories</option>
           {categories.map((c) => (
@@ -586,13 +585,13 @@ function GlobeFilterBar({ filters, categories, onChange }: GlobeFilterBarProps) 
       </label>
 
       {/* Status select — all/open/closed, default 'all' (VAL-GLOBE-011). */}
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+      <label className="flex flex-col gap-1 text-xs font-medium text-muted">
         Status
         <select
           data-testid="globe-filter-status"
           value={filters.status}
           onChange={(e) => onChange({ status: e.target.value as StatusFilter })}
-          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          className="input-cosmic w-auto px-2 py-1 text-sm"
         >
           <option value="all">All</option>
           <option value="open">Open</option>
@@ -603,7 +602,7 @@ function GlobeFilterBar({ filters, categories, onChange }: GlobeFilterBarProps) 
       {/* Window segmented control — 7/14/30, default 30 (VAL-GLOBE-012).
           Rendered as a <select> so it carries stable option values and is
           drivable via native events in agent-browser eval. */}
-      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+      <label className="flex flex-col gap-1 text-xs font-medium text-muted">
         Time window (days)
         <select
           data-testid="globe-filter-window"
@@ -611,7 +610,7 @@ function GlobeFilterBar({ filters, categories, onChange }: GlobeFilterBarProps) 
           onChange={(e) =>
             onChange({ days: Number(e.target.value) as 7 | 14 | 30 })
           }
-          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          className="input-cosmic w-auto px-2 py-1 text-sm"
         >
           {WINDOW_OPTIONS.map((d) => (
             <option key={d} value={String(d)}>
