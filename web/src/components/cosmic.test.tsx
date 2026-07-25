@@ -75,4 +75,28 @@ describe('AppLayout cosmic foundation', () => {
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Subscribers')).toBeInTheDocument();
   });
+
+  // VAL-THEME-007 stacking guard: the <header> uses backdrop-blur which
+  // establishes a new stacking context. Without an explicit z-index the
+  // later-in-DOM <main> (with the .card-cosmic APOD hero, also a backdrop-blur
+  // stacking context) paints on top of the user-menu dropdown that overflows
+  // below the header, burying the Logout item. jsdom cannot verify true paint
+  // order, so we lock in the class contract: the header carries a positioned
+  // z-index so its contents (the open dropdown) sit above page content.
+  it('the header carries a positioned z-index class (VAL-THEME-007 stacking guard)', () => {
+    const { container } = renderWithProviders(
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Child />} />
+        </Route>
+      </Routes>,
+      { routerProps: { initialEntries: ['/'], initialIndex: 0 } },
+    );
+
+    const header = container.querySelector('header');
+    expect(header).not.toBeNull();
+    expect(header!.className).toMatch(/\bz-50\b/);
+    // The header must also be a positioned element for z-index to take effect.
+    expect(header!.className).toMatch(/\b(relative|sticky|absolute|fixed)\b/);
+  });
 });
