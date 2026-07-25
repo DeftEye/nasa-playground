@@ -88,27 +88,34 @@ export function Register() {
 
   // PublicOnlyRoute redirects already-authenticated users away from
   // `/register`, so this component only renders for unauthenticated users.
+  //
+  // Restyle note (m14-auth-surfaces-restyle): only classes/wrappers were
+  // changed to apply the dark cosmic theme. The global cosmic background
+  // (deep-space gradient + starfield) is set on `body` in `index.css`, so
+  // this page intentionally does NOT set its own opaque background — the
+  // cosmic backdrop reads through. All field labels, validation/error copy,
+  // the `register-submit-error` testid, and the form behavior are preserved.
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-900">
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-star-white">
             NASA Sky Tracker
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-muted">
             Create a new account
           </p>
         </div>
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+          className="card-cosmic space-y-4 p-6"
           aria-label="Register form"
         >
           <div>
             <label
               htmlFor="register-email"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              className="mb-1 block text-sm font-medium text-star-white"
             >
               Email
             </label>
@@ -127,14 +134,14 @@ export function Register() {
               aria-describedby={
                 fieldErrors.email ? 'register-email-error' : undefined
               }
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              className="input-cosmic"
               placeholder="you@example.com"
             />
             {fieldErrors.email && (
               <p
                 id="register-email-error"
                 role="alert"
-                className="mt-1 text-sm text-red-600 dark:text-red-400"
+                className="field-error"
               >
                 {fieldErrors.email}
               </p>
@@ -143,7 +150,7 @@ export function Register() {
           <div>
             <label
               htmlFor="register-password"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              className="mb-1 block text-sm font-medium text-star-white"
             >
               Password
             </label>
@@ -162,14 +169,14 @@ export function Register() {
               aria-describedby={
                 fieldErrors.password ? 'register-password-error' : undefined
               }
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              className="input-cosmic"
               placeholder="At least 8 characters"
             />
             {fieldErrors.password && (
               <p
                 id="register-password-error"
                 role="alert"
-                className="mt-1 text-sm text-red-600 dark:text-red-400"
+                className="field-error"
               >
                 {fieldErrors.password}
               </p>
@@ -178,7 +185,7 @@ export function Register() {
           {submitError && (
             <p
               role="alert"
-              className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"
+              className="rounded-md border border-cosmic-error/30 bg-cosmic-error/10 px-3 py-2 text-sm text-cosmic-error"
               data-testid="register-submit-error"
             >
               {submitError}
@@ -187,15 +194,15 @@ export function Register() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-primary w-full"
           >
             {submitting ? 'Creating account…' : 'Create account'}
           </button>
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-center text-sm text-muted">
             Already have an account?{' '}
             <Link
               to="/login"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              className="font-medium text-nebula-purple-soft hover:text-star-white transition-colors"
             >
               Sign in
             </Link>
