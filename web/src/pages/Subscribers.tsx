@@ -127,15 +127,12 @@ export function Subscribers() {
   if (subscribersQuery.isPending) {
     return (
       <div data-testid="subscribers-skeleton" className="space-y-4">
-        <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+        <div className="card-cosmic p-4">
           <Skeleton rows={3} />
         </div>
         <div className="space-y-3">
           {Array.from({ length: 3 }, (_, i) => (
-            <div
-              key={i}
-              className="space-y-2 rounded-lg border border-gray-200 p-4 dark:border-gray-700"
-            >
+            <div key={i} className="card-cosmic space-y-2 p-4">
               <Skeleton rows={2} />
             </div>
           ))}
@@ -192,10 +189,10 @@ export function Subscribers() {
   return (
     <div data-testid="subscribers-page">
       <header className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h1 className="font-display text-2xl font-bold text-star-white">
           Subscribers
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted">
           Manage your Discord notification subscribers.
         </p>
       </header>
@@ -218,8 +215,7 @@ export function Subscribers() {
           description="Add your first subscriber using the form above."
         />
       ) : (
-        <ul className="mt-6 space-y-3" data-testid="subscribers-list">
-          {subscribers.map((subscriber) => (
+        <ul className="mt-6 space-y-3" data-testid="subscribers-list">          {subscribers.map((subscriber) => (
             <SubscriberRow
               key={subscriber.id}
               subscriber={subscriber}
@@ -351,18 +347,16 @@ function AddSubscriberForm({
       onSubmit={handleSubmit}
       noValidate
       aria-label="Add subscriber form"
-      className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+      className="card-cosmic space-y-4 p-4"
       data-testid="add-subscriber-form"
     >
-      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-        Add a subscriber
-      </h2>
+      <h2 className="section-heading text-base">Add a subscriber</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label
             htmlFor="sub-name"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="mb-1 block text-sm font-medium text-muted"
           >
             Name
           </label>
@@ -378,7 +372,7 @@ function AddSubscriberForm({
             }}
             aria-invalid={Boolean(fieldErrors.name)}
             aria-describedby={fieldErrors.name ? 'sub-name-error' : undefined}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            className="input-cosmic"
             placeholder="My Discord channel"
             data-testid="sub-name-input"
           />
@@ -386,7 +380,7 @@ function AddSubscriberForm({
             <p
               id="sub-name-error"
               role="alert"
-              className="mt-1 text-sm text-red-600 dark:text-red-400"
+              className="field-error"
               data-testid="sub-name-error"
             >
               {fieldErrors.name}
@@ -397,7 +391,7 @@ function AddSubscriberForm({
         <div>
           <label
             htmlFor="sub-webhook"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="mb-1 block text-sm font-medium text-muted"
           >
             Discord webhook URL
           </label>
@@ -417,7 +411,7 @@ function AddSubscriberForm({
                 ? 'sub-webhook-error'
                 : undefined
             }
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            className="input-cosmic"
             placeholder="https://discord.com/api/webhooks/…"
             data-testid="sub-webhook-input"
           />
@@ -425,7 +419,7 @@ function AddSubscriberForm({
             <p
               id="sub-webhook-error"
               role="alert"
-              className="mt-1 text-sm text-red-600 dark:text-red-400"
+              className="field-error"
               data-testid="sub-webhook-error"
             >
               {fieldErrors.discordWebhookUrl}
@@ -436,10 +430,10 @@ function AddSubscriberForm({
 
       {/* EONET category checkboxes (VAL-FE-SUB-003). */}
       <fieldset>
-        <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <legend className="text-sm font-medium text-muted">
           EONET categories
         </legend>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-muted/80">
           Select none to receive all EONET events; select specific categories to
           filter.
         </p>
@@ -448,12 +442,12 @@ function AddSubscriberForm({
           data-testid="sub-category-checkboxes"
         >
           {categories.length === 0 && (
-            <span className="text-xs text-gray-400">No categories loaded.</span>
+            <span className="text-xs text-muted">No categories loaded.</span>
           )}
           {categories.map((c) => (
             <label
               key={c.id}
-              className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200"
+              className="inline-flex items-center gap-2 text-sm text-star-white"
             >
               <input
                 type="checkbox"
@@ -461,7 +455,7 @@ function AddSubscriberForm({
                 onChange={() => toggleSlug(c.id)}
                 data-testid="sub-category-checkbox"
                 data-category={c.id}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-nebula-purple/40 bg-deep-space-darker text-nebula-purple accent-nebula-purple focus:ring-nebula-purple-soft"
               />
               {c.title}
             </label>
@@ -470,13 +464,13 @@ function AddSubscriberForm({
       </fieldset>
 
       {/* apodEnabled toggle (VAL-FE-SUB-003). */}
-      <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+      <label className="inline-flex items-center gap-2 text-sm text-star-white">
         <input
           type="checkbox"
           checked={apodEnabled}
           onChange={(e) => setApodEnabled(e.target.checked)}
           data-testid="sub-apod-toggle"
-          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 rounded border-nebula-purple/40 bg-deep-space-darker text-nebula-purple accent-nebula-purple focus:ring-nebula-purple-soft"
         />
         Receive APOD notifications
       </label>
@@ -484,7 +478,7 @@ function AddSubscriberForm({
       {submitError && (
         <p
           role="alert"
-          className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"
+          className="rounded-md border border-cosmic-error/40 bg-cosmic-error/10 px-3 py-2 text-sm text-cosmic-error"
           data-testid="add-subscriber-submit-error"
         >
           {submitError}
@@ -494,7 +488,7 @@ function AddSubscriberForm({
       <button
         type="submit"
         disabled={creating}
-        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-primary"
         data-testid="add-subscriber-submit"
       >
         {creating ? 'Adding…' : 'Add subscriber'}
@@ -552,7 +546,7 @@ function SubscriberRow({
 
   return (
     <li
-      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+      className="card-cosmic p-4"
       data-testid="subscriber-row"
       data-subscriber-id={subscriber.id}
     >
@@ -560,14 +554,14 @@ function SubscriberRow({
         <div className="min-w-0">
           {/* Name rendered as TEXT (architecture §6 security). */}
           <h2
-            className="truncate text-base font-semibold text-gray-900 dark:text-gray-100"
+            className="truncate text-base font-semibold text-star-white"
             data-testid="subscriber-name"
           >
             {subscriber.name}
           </h2>
           {/* Masked webhook URL — raw URL never in the DOM (VAL-FE-SUB-004). */}
           <p
-            className="mt-0.5 font-mono text-xs text-gray-500 dark:text-gray-400"
+            className="mt-0.5 font-mono text-xs text-muted"
             data-testid="subscriber-masked-webhook"
           >
             {subscriber.maskedWebhookUrl}
@@ -577,7 +571,7 @@ function SubscriberRow({
           <button
             type="button"
             onClick={onEdit}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="btn-secondary px-3 py-1.5 text-sm"
             data-testid="subscriber-edit-btn"
           >
             Edit
@@ -586,7 +580,7 @@ function SubscriberRow({
             type="button"
             onClick={onSendTest}
             disabled={sendingTest}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="btn-secondary px-3 py-1.5 text-sm"
             data-testid="subscriber-send-test-btn"
           >
             {sendingTest ? 'Sending…' : 'Send test'}
@@ -594,7 +588,7 @@ function SubscriberRow({
           <button
             type="button"
             onClick={onDelete}
-            className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:bg-gray-800 dark:text-red-300 dark:hover:bg-red-900/30"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-cosmic-error/50 bg-cosmic-error/10 px-3 py-1.5 text-sm font-semibold text-cosmic-error transition-colors hover:bg-cosmic-error/20 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cosmic-error"
             data-testid="subscriber-delete-btn"
           >
             Delete
@@ -608,19 +602,19 @@ function SubscriberRow({
         data-testid="subscriber-meta"
       >
         {subscriber.apodEnabled && (
-          <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+          <span className="inline-flex items-center rounded-full border border-nebula-purple/40 bg-nebula-purple/15 px-2.5 py-0.5 text-xs font-medium text-nebula-purple-soft">
             APOD
           </span>
         )}
         {subscriber.eonetCategorySlugs.length === 0 ? (
-          <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
+          <span className="inline-flex items-center rounded-full border border-nebula-purple/40 bg-nebula-purple/15 px-2.5 py-0.5 text-xs font-medium text-nebula-purple-soft">
             All EONET categories
           </span>
         ) : (
           subscriber.eonetCategorySlugs.map((slug) => (
             <span
               key={slug}
-              className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+              className="inline-flex items-center rounded-full border border-nebula-purple/25 bg-deep-space-lighter/60 px-2.5 py-0.5 text-xs font-medium text-muted"
               data-testid="subscriber-category-chip"
             >
               {slug}
@@ -628,7 +622,7 @@ function SubscriberRow({
           ))
         )}
         {!subscriber.enabled && (
-          <span className="inline-flex items-center rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-600 dark:text-gray-100">
+          <span className="inline-flex items-center rounded-full border border-muted/30 bg-deep-space-lighter/60 px-2.5 py-0.5 text-xs font-medium text-muted">
             disabled
           </span>
         )}
@@ -644,7 +638,7 @@ function SubscriberRow({
           {testState.status === 'failed' ? (
             <p
               role="alert"
-              className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"
+              className="rounded-md border border-cosmic-error/40 bg-cosmic-error/10 px-3 py-2 text-sm text-cosmic-error"
               data-testid="subscriber-test-failed"
             >
               Test notification failed
@@ -652,7 +646,7 @@ function SubscriberRow({
             </p>
           ) : (
             <p
-              className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-300"
+              className="rounded-md border border-cosmic-success/40 bg-cosmic-success/10 px-3 py-2 text-sm text-cosmic-success"
               data-testid="subscriber-test-success"
             >
               Test notification sent (status: {testState.status}).
@@ -731,18 +725,16 @@ function EditSubscriberForm({
 
   return (
     <li
-      className="rounded-lg border border-blue-300 bg-white p-4 shadow-sm dark:border-blue-700 dark:bg-gray-800"
+      className="card-cosmic border-nebula-purple/50 p-4"
       data-testid="subscriber-edit-form"
       data-subscriber-id={subscriber.id}
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-3">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-          Edit subscriber
-        </h2>
+        <h2 className="section-heading text-base">Edit subscriber</h2>
         <div>
           <label
             htmlFor={`edit-name-${subscriber.id}`}
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="mb-1 block text-sm font-medium text-muted"
           >
             Name
           </label>
@@ -754,21 +746,18 @@ function EditSubscriberForm({
               setName(e.target.value);
               if (fieldError) setFieldError(undefined);
             }}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            className="input-cosmic"
             data-testid="edit-name-input"
           />
           {fieldError && (
-            <p
-              role="alert"
-              className="mt-1 text-sm text-red-600 dark:text-red-400"
-            >
+            <p role="alert" className="field-error">
               {fieldError}
             </p>
           )}
         </div>
 
         <fieldset>
-          <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <legend className="text-sm font-medium text-muted">
             EONET categories
           </legend>
           <div
@@ -778,7 +767,7 @@ function EditSubscriberForm({
             {categories.map((c) => (
               <label
                 key={c.id}
-                className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200"
+                className="inline-flex items-center gap-2 text-sm text-star-white"
               >
                 <input
                   type="checkbox"
@@ -786,7 +775,7 @@ function EditSubscriberForm({
                   onChange={() => toggleSlug(c.id)}
                   data-testid="edit-category-checkbox"
                   data-category={c.id}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-nebula-purple/40 bg-deep-space-darker text-nebula-purple accent-nebula-purple focus:ring-nebula-purple-soft"
                 />
                 {c.title}
               </label>
@@ -794,13 +783,13 @@ function EditSubscriberForm({
           </div>
         </fieldset>
 
-        <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+        <label className="inline-flex items-center gap-2 text-sm text-star-white">
           <input
             type="checkbox"
             checked={apodEnabled}
             onChange={(e) => setApodEnabled(e.target.checked)}
             data-testid="edit-apod-toggle"
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="h-4 w-4 rounded border-nebula-purple/40 bg-deep-space-darker text-nebula-purple accent-nebula-purple focus:ring-nebula-purple-soft"
           />
           Receive APOD notifications
         </label>
@@ -809,7 +798,7 @@ function EditSubscriberForm({
           <button
             type="submit"
             disabled={saving || !changed}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-primary"
             data-testid="edit-save-btn"
           >
             {saving ? 'Saving…' : 'Save'}
@@ -817,7 +806,7 @@ function EditSubscriberForm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="btn-secondary"
             data-testid="edit-cancel-btn"
           >
             Cancel
@@ -843,35 +832,35 @@ function DeleteConfirmModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-deep-space-darker/80 p-4 backdrop-blur-sm"
       onClick={onCancel}
       data-testid="delete-modal-backdrop"
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800"
+        className="card-cosmic w-full max-w-md overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         data-testid="delete-modal"
         role="dialog"
         aria-modal="true"
         aria-label="Confirm delete subscriber"
       >
-        <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-            Delete subscriber
-          </h2>
+        <div className="border-b border-nebula-purple/25 px-4 py-3">
+          <h2 className="section-heading text-base">Delete subscriber</h2>
         </div>
         <div className="px-4 py-4">
-          <p className="text-sm text-gray-700 dark:text-gray-200">
+          <p className="text-sm text-muted">
             Are you sure you want to delete{' '}
-            <span className="font-semibold">{subscriber.name}</span>? This
-            cannot be undone.
+            <span className="font-semibold text-star-white">
+              {subscriber.name}
+            </span>
+            ? This cannot be undone.
           </p>
         </div>
-        <div className="flex justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+        <div className="flex justify-end gap-2 border-t border-nebula-purple/25 px-4 py-3">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="btn-secondary"
             data-testid="delete-cancel-btn"
           >
             Cancel
@@ -879,7 +868,7 @@ function DeleteConfirmModal({
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-cosmic-error/60 bg-cosmic-error/20 px-4 py-2 text-sm font-semibold text-cosmic-error transition-colors hover:bg-cosmic-error/30 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cosmic-error"
             data-testid="delete-confirm-btn"
           >
             Confirm delete

@@ -97,7 +97,7 @@ export function NotificationsLog() {
           {Array.from({ length: 5 }, (_, i) => (
             <div
               key={i}
-              className="h-10 w-full animate-pulse rounded bg-gray-200 dark:bg-gray-700"
+              className="h-10 w-full animate-pulse rounded bg-deep-space-lighter"
             />
           ))}
         </div>
@@ -120,22 +120,22 @@ export function NotificationsLog() {
   return (
     <div data-testid="notif-page">
       <header className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h1 className="font-display text-2xl font-bold text-star-white">
           Notifications
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted">
           Delivery log for your subscribers (newest first).
         </p>
       </header>
 
       {/* Filters: source + status dropdowns (VAL-FE-NOTIF-002/006). */}
       <div className="mb-4 flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-          <span className="font-medium">Source</span>
+        <label className="flex items-center gap-2 text-sm text-star-white">
+          <span className="font-medium text-muted">Source</span>
           <select
             value={source}
             onChange={(e) => setSource(e.target.value as SourceFilter)}
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            className="input-cosmic w-auto px-2 py-1 text-sm"
             data-testid="notif-source-filter"
           >
             {SOURCE_OPTIONS.map((s) => (
@@ -145,12 +145,12 @@ export function NotificationsLog() {
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-          <span className="font-medium">Status</span>
+        <label className="flex items-center gap-2 text-sm text-star-white">
+          <span className="font-medium text-muted">Status</span>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as StatusFilter)}
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            className="input-cosmic w-auto px-2 py-1 text-sm"
             data-testid="notif-status-filter"
           >
             {STATUS_OPTIONS.map((s) => (
@@ -169,12 +169,12 @@ export function NotificationsLog() {
           description="When your subscribers receive notifications, they'll be logged here."
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="card-cosmic overflow-x-auto">
           <table
-            className="min-w-full divide-y divide-gray-200 dark:divide-gray-700"
+            className="min-w-full divide-y divide-nebula-purple/20"
             data-testid="notif-table"
           >
-            <thead className="bg-gray-50 dark:bg-gray-800">
+            <thead className="bg-deep-space-darker/60">
               <tr>
                 <Th testId="notif-th-deliveredAt">deliveredAt</Th>
                 <Th testId="notif-th-source">source</Th>
@@ -183,12 +183,12 @@ export function NotificationsLog() {
                 <Th testId="notif-th-status">status</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-900">
+            <tbody className="divide-y divide-nebula-purple/15">
               {rows.map((row) => (
                 <tr
                   key={row.id}
                   onClick={() => setSelected(row)}
-                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                  className="cursor-pointer transition-colors hover:bg-nebula-purple/10"
                   data-testid="notif-row"
                   data-notification-id={row.id}
                 >
@@ -250,7 +250,7 @@ function Th({
   return (
     <th
       scope="col"
-      className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300"
+      className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted"
       data-testid={testId}
     >
       {children}
@@ -260,7 +260,7 @@ function Th({
 
 function Td({ children }: { children: React.ReactNode }) {
   return (
-    <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+    <td className="whitespace-nowrap px-4 py-2 text-sm text-star-white">
       {children}
     </td>
   );
@@ -269,13 +269,13 @@ function Td({ children }: { children: React.ReactNode }) {
 function StatusBadge({ status }: { status: NotificationStatus }) {
   const cls =
     status === 'sent'
-      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+      ? 'border-cosmic-success/40 bg-cosmic-success/15 text-cosmic-success'
       : status === 'mocked'
-        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
-        : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200';
+        ? 'border-nebula-purple/40 bg-nebula-purple/15 text-nebula-purple-soft'
+        : 'border-cosmic-error/40 bg-cosmic-error/15 text-cosmic-error';
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${cls}`}
       data-testid="notif-cell-status"
     >
       {status}
@@ -301,26 +301,24 @@ function PayloadModal({
   const payloadJson = JSON.stringify(notification.payload, null, 2);
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-deep-space-darker/80 p-4 backdrop-blur-sm"
       onClick={onClose}
       data-testid="notif-modal-backdrop"
     >
       <div
-        className="w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800"
+        className="card-cosmic w-full max-w-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         data-testid="notif-modal"
         role="dialog"
         aria-modal="true"
         aria-label="Notification payload"
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-            Notification payload
-          </h2>
+        <div className="flex items-center justify-between border-b border-nebula-purple/25 px-4 py-3">
+          <h2 className="section-heading text-base">Notification payload</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-2 py-1 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="rounded-md px-2 py-1 text-sm font-medium text-muted transition-colors hover:bg-nebula-purple/15 hover:text-star-white"
             aria-label="Close payload modal"
             data-testid="notif-modal-close"
           >
@@ -328,7 +326,7 @@ function PayloadModal({
           </button>
         </div>
         <div className="max-h-[70vh] overflow-auto p-4">
-          <dl className="mb-3 grid grid-cols-3 gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+          <dl className="mb-3 grid grid-cols-3 gap-x-4 gap-y-1 text-xs text-muted">
             <dt className="font-medium">deliveredAt</dt>
             <dd className="col-span-2 font-mono">
               {formatLocalIso(notification.deliveredAt)}
@@ -342,7 +340,7 @@ function PayloadModal({
             {notification.error && (
               <>
                 <dt className="font-medium">error</dt>
-                <dd className="col-span-2 font-mono text-red-600 dark:text-red-400">
+                <dd className="col-span-2 font-mono text-cosmic-error">
                   {notification.error}
                 </dd>
               </>
@@ -352,7 +350,7 @@ function PayloadModal({
               webhook URL (`/webhooks/.../<last-4>`) is the only webhook
               reference that ever appears (VAL-FE-NOTIF-004). */}
           <pre
-            className="overflow-auto rounded bg-gray-900 p-3 text-xs leading-relaxed text-gray-100"
+            className="overflow-auto rounded border border-nebula-purple/20 bg-deep-space-darker/80 p-3 text-xs leading-relaxed text-star-white"
             data-testid="notif-modal-payload"
           >
             {payloadJson}
