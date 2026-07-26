@@ -66,21 +66,30 @@ export function Landing() {
           // pinpoints. This reads even if /landing-hero.jpg is absent.
           backgroundColor: 'var(--color-deep-space-base)',
           backgroundImage: [
-            // Starfield pinpoints (fallback layer).
-            'radial-gradient(1.5px 1.5px at 18% 22%, rgba(255,255,255,0.8) 50%, transparent 51%)',
-            'radial-gradient(1px 1px at 32% 68%, rgba(255,255,255,0.55) 50%, transparent 51%)',
-            'radial-gradient(1.5px 1.5px at 51% 38%, rgba(255,255,255,0.7) 50%, transparent 51%)',
-            'radial-gradient(1px 1px at 67% 14%, rgba(255,255,255,0.5) 50%, transparent 51%)',
-            'radial-gradient(1.5px 1.5px at 79% 62%, rgba(255,255,255,0.65) 50%, transparent 51%)',
-            'radial-gradient(1px 1px at 88% 84%, rgba(255,255,255,0.55) 50%, transparent 51%)',
-            'radial-gradient(1px 1px at 24% 88%, rgba(255,255,255,0.6) 50%, transparent 51%)',
+            // Starfield pinpoints (fallback layer). Theme-aware: dark mode
+            // shows faint white stars on deep-space; cosmic-light shows
+            // toned-down lavender/indigo pinpoints on the daytime sky
+            // (M17 light-theme audit — previously hardcoded white rgba that
+            // was invisible on the light background).
+            'radial-gradient(1.5px 1.5px at 18% 22%, var(--starfield-1) 50%, transparent 51%)',
+            'radial-gradient(1px 1px at 32% 68%, var(--starfield-2) 50%, transparent 51%)',
+            'radial-gradient(1.5px 1.5px at 51% 38%, var(--starfield-3) 50%, transparent 51%)',
+            'radial-gradient(1px 1px at 67% 14%, var(--starfield-4) 50%, transparent 51%)',
+            'radial-gradient(1.5px 1.5px at 79% 62%, var(--starfield-5) 50%, transparent 51%)',
+            'radial-gradient(1px 1px at 88% 84%, var(--starfield-6) 50%, transparent 51%)',
+            'radial-gradient(1px 1px at 24% 88%, var(--starfield-7) 50%, transparent 51%)',
             // Cosmic vertical gradient (fallback layer).
             'linear-gradient(180deg, var(--color-deep-space-darker) 0%, var(--color-deep-space-base) 40%, var(--color-deep-space-lighter) 70%, var(--color-deep-space-darker) 100%)',
-            // Optional hero image (top layer), darkened by a translucent
-            // overlay gradient so the headline remains legible. If the file
-            // is absent the browser ignores this layer and the fallbacks
-            // above remain. The url() is never bundler-imported.
-            "linear-gradient(180deg, rgba(4,4,12,0.65) 0%, rgba(10,10,26,0.55) 60%, rgba(4,4,12,0.8) 100%), url('/landing-hero.jpg')",
+            // Optional hero image (top layer), layered under a theme-aware
+            // overlay so the headline remains legible. The overlay is dark
+            // in dark mode (white headline on dark) and light in
+            // cosmic-light (dark-ink headline on light) — see the
+            // `--hero-overlay-*` vars in index.css (M17 light-theme audit:
+            // previously a hardcoded dark rgba that made the dark-ink
+            // headline low-contrast in light mode). If the file is absent
+            // the browser ignores this layer and the fallbacks above
+            // remain. The url() is never bundler-imported.
+            'linear-gradient(180deg, var(--hero-overlay-top) 0%, var(--hero-overlay-mid) 60%, var(--hero-overlay-bottom) 100%), url(\'/landing-hero.jpg\')',
           ].join(', '),
           backgroundSize: 'cover, cover, cover, cover, cover, cover, cover, cover, cover',
           backgroundPosition: 'center',

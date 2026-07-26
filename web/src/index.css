@@ -127,6 +127,18 @@
   --starfield-8: rgba(255, 255, 255, 0.45);
   --starfield-9: rgba(255, 255, 255, 0.6);
 
+  /* Landing-hero image overlay (M17 light-theme audit). A translucent overlay
+   * layered between the cosmic gradient fallback and the optional
+   * /landing-hero.jpg so the headline stays legible over the image. Dark
+   * values are the pre-M17 hardcoded dark rgba (white headline on a dark
+   * overlay over a dark image); the light selector overrides them with a
+   * light overlay so the dark-ink headline stays legible in cosmic-light.
+   * The dark values EXACTLY equal the previously-hardcoded rgba so dark mode
+   * is byte-for-byte unchanged. */
+  --hero-overlay-top: rgba(4, 4, 12, 0.65);
+  --hero-overlay-mid: rgba(10, 10, 26, 0.55);
+  --hero-overlay-bottom: rgba(4, 4, 12, 0.8);
+
   /* Dark is the default theme. */
   color-scheme: dark;
 }
@@ -190,6 +202,15 @@
   --starfield-7: rgba(109, 40, 217, 0.09);
   --starfield-8: rgba(99, 102, 241, 0.06);
   --starfield-9: rgba(109, 40, 217, 0.08);
+
+  /* Landing-hero image overlay — light variants. A light lavender/white
+   * overlay over the optional hero image so the dark-ink headline
+   * (--color-star-white flipped to #1a1a2e) stays readable in cosmic-light,
+   * mirroring how the dark overlay keeps the white headline readable in
+   * dark mode. */
+  --hero-overlay-top: rgba(243, 240, 251, 0.72);
+  --hero-overlay-mid: rgba(243, 240, 251, 0.55);
+  --hero-overlay-bottom: rgba(221, 214, 236, 0.82);
 
   color-scheme: light;
 }
