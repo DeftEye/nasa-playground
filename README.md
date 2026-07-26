@@ -67,7 +67,11 @@ In production, `synchronize` is disabled and the schema must be applied via migr
 
 ## Frontend
 
-A single dark "cosmic" theme is applied across the entire app: a deep-space gradient background plus starfield, nebula purple and indigo accents, coral/dune warm accents, and star-white text. Light mode was dropped, so the app is dark-theme only. The theme is defined in `web/src/index.css` using Tailwind v4 CSS-first `@theme` blocks plus `:root` CSS custom properties. Shared component primitives (`.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.card-cosmic`, `.input-cosmic`, `.field-error`, `.section-heading`) are reused by every page so the visual language stays consistent from the landing page through the authenticated app.
+### Theme (dark / light)
+
+The app ships two themes: a dark "cosmic" theme (deep-space gradient with starfield, nebula purple and indigo accents, coral/dune warm accents, star-white text) and a "cosmic-light" theme (a soft daytime lavender-sky palette that keeps the nebula purple and indigo accents). The active theme is driven by a `data-theme="dark"|"light"` attribute on the `<html>` element, set before the React bundle loads by a small inline script in `web/index.html` so there is no flash of the wrong theme on first paint. Theme tokens live in `web/src/index.css`: the dark palette is the `:root` default, and a `:root[data-theme='light']` override block provides the light palette. Theme-aware CSS variables drive the body background gradient, starfield, accent glows, and the shared `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.card-cosmic`, `.input-cosmic`, `.field-error`, and `.section-heading` primitives, so both themes render consistently from the landing page through the authenticated app.
+
+A `ThemeProvider` plus a `useTheme` hook (`web/src/theme/`) resolves the initial theme in this order: a valid stored `localStorage.theme` value (`dark` / `light`) when present, else the OS preference via `window.matchMedia('(prefers-color-scheme: dark)')` (dark when it matches, light otherwise), else dark. The chosen theme is persisted to the `theme` localStorage key. Dark remains the default and is visually unchanged from the previous single-theme build. A `ThemeToggle` component (`web/src/components/ThemeToggle.tsx`, sun/moon affordance, accessible `aria-label`, `data-testid="theme-toggle"`) appears in the authenticated app header (`AppLayout`) and on the public pages (`/`, `/login`, `/register`), so users can switch theme anywhere.
 
 ### Routing
 
@@ -316,12 +320,13 @@ docker compose -f docker-compose.prod.yml down -v
   web/                       Vite + React + TS + Tailwind frontend
     src/
       pages/                 Landing (public, at /), Home (dashboard, at /dashboard), ApodArchive, EonetFeed, EonetGlobe, NotificationsLog, Subscribers, Login, Register, NotFound
-      components/            ApodHero, Skeleton, EmptyState, ErrorState, AppLayout, UserMenu
+      components/            ApodHero, Skeleton, EmptyState, ErrorState, AppLayout, UserMenu, ThemeToggle
       components/globe/      GlobeView (react-globe.gl), GlobeFilterBar, GlobeErrorBoundary, WebGL guard
       auth/                  AuthProvider, ProtectedRoute, PublicOnlyRoute
+      theme/                 ThemeProvider, useTheme hook, initial-resolution helper (localStorage `theme`, OS preference via matchMedia, defaults to dark)
       api/                   axios client + per-domain wrappers
       test/                  MSW server, render helpers, setup
-      index.css              Tailwind v4 CSS-first `@theme`, `:root` cosmic theme tokens, and shared component primitives
+      index.css              Tailwind v4 CSS-first `@theme`, dual-theme `:root` tokens (dark default + `:root[data-theme='light']` override), and shared component primitives
     public/
       favicon.svg            Cosmic-themed favicon
       countries.geojson      Natural Earth 110m countries (bundled; client-side country resolution via @turf)
