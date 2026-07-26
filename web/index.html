@@ -5,6 +5,42 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NASA Sky Tracker</title>
+    <!--
+      Anti-FOUC theme script (M17 — VAL-THEME-008).
+      Sets `document.documentElement.dataset.theme` to the resolved theme
+      BEFORE the React bundle loads, so there is no flash of the wrong theme
+      on first paint. Resolution order MUST match `web/src/theme/resolveTheme.ts`:
+        1. valid stored `localStorage.theme` (`'dark'` | `'light'`) wins;
+        2. else `window.matchMedia('(prefers-color-scheme: dark)')` →
+           `'dark'` if it matches, `'light'` otherwise;
+        3. else default `'dark'` when `matchMedia` is unavailable.
+      This is a tiny inline script (no imports) so it runs synchronously
+      before the module bundle; `ThemeProvider` re-applies the same value on
+      mount and keeps it in sync on toggles.
+    -->
+    <script>
+      (function () {
+        var resolved = 'dark';
+        try {
+          var stored = localStorage.getItem('theme');
+          if (stored === 'dark' || stored === 'light') {
+            resolved = stored;
+          } else {
+            var mql =
+              typeof window !== 'undefined' &&
+              typeof window.matchMedia === 'function'
+                ? window.matchMedia('(prefers-color-scheme: dark)')
+                : null;
+            if (mql && typeof mql.matches === 'boolean') {
+              resolved = mql.matches ? 'dark' : 'light';
+            }
+          }
+        } catch (e) {
+          // localStorage / matchMedia unavailable — keep the 'dark' default.
+        }
+        document.documentElement.setAttribute('data-theme', resolved);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
