@@ -160,4 +160,18 @@ describe('Landing page (VAL-LANDING-001..005)', () => {
     expect(screen.getByTestId('landing-feature-globe')).toBeInTheDocument();
     expect(screen.getByTestId('landing-footer')).toBeInTheDocument();
   });
+
+  // M17 / VAL-THEME-011: a theme toggle is present on the public Landing
+  // page so logged-out visitors can switch themes before signing in.
+  it('renders a theme-toggle on the public Landing page (VAL-THEME-011)', () => {
+    renderWithProviders(<LandingTree />, {
+      routerProps: { initialEntries: ['/'], initialIndex: 0 },
+    });
+
+    const toggle = screen.getByTestId('theme-toggle');
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.getAttribute('aria-label')).toMatch(
+      /switch to (light|dark) mode/i,
+    );
+  });
 });

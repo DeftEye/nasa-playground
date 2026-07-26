@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 /**
  * Landing page — public space-themed marketing page
@@ -30,6 +31,17 @@ import { Link } from 'react-router-dom';
 export function Landing() {
   return (
     <div className="flex min-h-screen flex-col text-star-white">
+      {/* ====================================================================
+       * Top bar — public theme toggle (M17 / VAL-THEME-011).
+       * --------------------------------------------------------------------
+       * A thin top strip so logged-out visitors can switch dark/light
+       * before signing in. Kept separate from the hero so the hero art,
+       * copy, CTAs, and testids are undisturbed.
+       * ================================================================= */}
+      <div className="flex items-center justify-end px-4 py-2">
+        <ThemeToggle />
+      </div>
+
       {/* ====================================================================
        * (a) HERO
        * --------------------------------------------------------------------

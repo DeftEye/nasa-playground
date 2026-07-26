@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router-dom';
 import { UserMenu } from './UserMenu';
+import { ThemeToggle } from './ThemeToggle';
 
 /**
  * AppLayout — the shell for all authenticated pages (cosmic redesign, M14+).
@@ -46,6 +47,7 @@ export function AppLayout() {
             <Link to="/subscribers" className={navLinkClass}>
               Subscribers
             </Link>
+            <ThemeToggle />
             <UserMenu />
           </nav>
         </div>

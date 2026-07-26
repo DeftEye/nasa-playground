@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 /**
  * Register page (architecture §6 / VAL-FE-AUTH-005..008).
@@ -96,7 +97,12 @@ export function Register() {
   // cosmic backdrop reads through. All field labels, validation/error copy,
   // the `register-submit-error` testid, and the form behavior are preserved.
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-10">
+      {/* Public theme toggle (M17 / VAL-THEME-011). Absolutely positioned
+          top-right so the centered form copy/testids/CTAs are undisturbed. */}
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <h1 className="font-display text-2xl font-bold tracking-tight text-star-white">
