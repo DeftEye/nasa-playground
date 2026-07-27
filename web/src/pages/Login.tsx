@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 /**
  * Login page (architecture §6 / VAL-FE-AUTH-001..004, 008).
@@ -97,117 +98,132 @@ export function Login() {
   // this page intentionally does NOT set its own opaque background — the
   // cosmic backdrop reads through. All field labels, validation/error copy,
   // the `login-submit-error` testid, and the form behavior are preserved.
+  //
+  // Layout note (misc-theme-polish): the page is a vertical flex column with
+  // a top header row holding the ThemeToggle (right-aligned) and a flex-1
+  // region that vertically/horizontally centers the form. This guarantees
+  // the toggle NEVER overlaps the centered heading/fields on narrow
+  // (~320px) viewports (the toggle owns its own row), while keeping it
+  // top-right on every screen width.
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <h1 className="font-display text-2xl font-bold tracking-tight text-star-white">
-            NASA Sky Tracker
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Sign in to your account
-          </p>
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          className="card-cosmic space-y-4 p-6"
-          aria-label="Login form"
-        >
-          <div>
-            <label
-              htmlFor="login-email"
-              className="mb-1 block text-sm font-medium text-star-white"
-            >
-              Email
-            </label>
-            <input
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (fieldErrors.email)
-                  setFieldErrors((p) => ({ ...p, email: undefined }));
-              }}
-              aria-invalid={Boolean(fieldErrors.email)}
-              aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
-              className="input-cosmic"
-              placeholder="you@example.com"
-            />
-            {fieldErrors.email && (
-              <p
-                id="login-email-error"
-                role="alert"
-                className="field-error"
-              >
-                {fieldErrors.email}
-              </p>
-            )}
-          </div>
-          <div>
-            <label
-              htmlFor="login-password"
-              className="mb-1 block text-sm font-medium text-star-white"
-            >
-              Password
-            </label>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (fieldErrors.password)
-                  setFieldErrors((p) => ({ ...p, password: undefined }));
-              }}
-              aria-invalid={Boolean(fieldErrors.password)}
-              aria-describedby={
-                fieldErrors.password ? 'login-password-error' : undefined
-              }
-              className="input-cosmic"
-              placeholder="••••••••"
-            />
-            {fieldErrors.password && (
-              <p
-                id="login-password-error"
-                role="alert"
-                className="field-error"
-              >
-                {fieldErrors.password}
-              </p>
-            )}
-          </div>
-          {submitError && (
-            <p
-              role="alert"
-              className="rounded-md border border-cosmic-error/30 bg-cosmic-error/10 px-3 py-2 text-sm text-cosmic-error"
-              data-testid="login-submit-error"
-            >
-              {submitError}
+    <div className="flex min-h-screen flex-col">
+      {/* Public theme toggle (M17 / VAL-THEME-011). Top header row keeps it
+          top-right on every viewport and out of the way of the centered
+          form on narrow (~320px) screens. */}
+      <div className="flex justify-end p-4">
+        <ThemeToggle />
+      </div>
+      <div className="flex flex-1 items-center justify-center px-4 pb-10">
+        <div className="w-full max-w-md">
+          <div className="mb-6 text-center">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-star-white">
+              NASA Sky Tracker
+            </h1>
+            <p className="mt-1 text-sm text-muted">
+              Sign in to your account
             </p>
-          )}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="btn-primary w-full"
+          </div>
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            className="card-cosmic space-y-4 p-6"
+            aria-label="Login form"
           >
-            {submitting ? 'Signing in…' : 'Sign in'}
-          </button>
-          <p className="text-center text-sm text-muted">
-            Don&apos;t have an account?{' '}
-            <Link
-              to="/register"
-              className="font-medium text-nebula-purple-soft hover:text-star-white transition-colors"
+            <div>
+              <label
+                htmlFor="login-email"
+                className="mb-1 block text-sm font-medium text-star-white"
+              >
+                Email
+              </label>
+              <input
+                id="login-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email)
+                    setFieldErrors((p) => ({ ...p, email: undefined }));
+                }}
+                aria-invalid={Boolean(fieldErrors.email)}
+                aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
+                className="input-cosmic"
+                placeholder="you@example.com"
+              />
+              {fieldErrors.email && (
+                <p
+                  id="login-email-error"
+                  role="alert"
+                  className="field-error"
+                >
+                  {fieldErrors.email}
+                </p>
+              )}
+            </div>
+            <div>
+              <label
+                htmlFor="login-password"
+                className="mb-1 block text-sm font-medium text-star-white"
+              >
+                Password
+              </label>
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (fieldErrors.password)
+                    setFieldErrors((p) => ({ ...p, password: undefined }));
+                }}
+                aria-invalid={Boolean(fieldErrors.password)}
+                aria-describedby={
+                  fieldErrors.password ? 'login-password-error' : undefined
+                }
+                className="input-cosmic"
+                placeholder="••••••••"
+              />
+              {fieldErrors.password && (
+                <p
+                  id="login-password-error"
+                  role="alert"
+                  className="field-error"
+                >
+                  {fieldErrors.password}
+                </p>
+              )}
+            </div>
+            {submitError && (
+              <p
+                role="alert"
+                className="rounded-md border border-cosmic-error/30 bg-cosmic-error/10 px-3 py-2 text-sm text-cosmic-error"
+                data-testid="login-submit-error"
+              >
+                {submitError}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary w-full"
             >
-              Register
-            </Link>
-          </p>
-        </form>
+              {submitting ? 'Signing in…' : 'Sign in'}
+            </button>
+            <p className="text-center text-sm text-muted">
+              Don&apos;t have an account?{' '}
+              <Link
+                to="/register"
+                className="font-medium text-nebula-purple-soft hover:text-star-white transition-colors"
+              >
+                Register
+              </Link>
+            </p>
+          </form>
+        </div>
       </div>
     </div>
   );

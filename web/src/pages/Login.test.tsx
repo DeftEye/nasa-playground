@@ -314,3 +314,21 @@ describe('Login deep-link return through PublicOnlyRoute (VAL-ROUTING-005)', () 
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe(TOKEN);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Public theme toggle (M17 / VAL-THEME-011)
+// ---------------------------------------------------------------------------
+
+describe('Login public theme toggle (VAL-THEME-011)', () => {
+  it('renders a theme-toggle on the Login page', () => {
+    renderWithProviders(<LoginTree />, {
+      routerProps: { initialEntries: ['/login'] },
+    });
+
+    const toggle = screen.getByTestId('theme-toggle');
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.getAttribute('aria-label')).toMatch(
+      /switch to (light|dark) mode/i,
+    );
+  });
+});

@@ -1,15 +1,28 @@
 @import 'tailwindcss';
 
 /* =========================================================================
- * Cosmic design-system foundation (M14+)
+ * Cosmic design-system foundation (M14+), DUAL dark + cosmic-light (M17)
  * -------------------------------------------------------------------------
  * Tailwind v4 CSS-first configuration: NO tailwind.config.js. The
  * @tailwindcss/vite plugin processes this file at build time.
  *
- * Single dark "cosmic" theme (light mode dropped). Tokens are exposed both
- * as CSS custom properties (in :root) and as Tailwind v4 `@theme` color
- * tokens so utilities like `bg-deep-space-base`, `text-star-white`,
- * `text-nebula-purple` etc. are available throughout the app.
+ * DUAL theme (M17): the active theme is driven by a `data-theme="dark"|"light"`
+ * attribute on the <html> element. `:root` holds the DARK token values as the
+ * default; `:root[data-theme='light']` overrides the palette for a
+ * cosmic-light variant. Dark is the default and the fallback. The same tokens
+ * are exposed both as Tailwind v4 `@theme` color tokens (so utilities like
+ * `bg-deep-space-base`, `text-star-white`, `text-nebula-purple` work) and as
+ * plain CSS custom properties on `:root` (so non-Tailwind CSS can consume
+ * them). Overriding the CSS vars under `:root[data-theme='light']` flips the
+ * Tailwind utilities automatically (they reference `var(--color-*)`).
+ *
+ * Theme-aware primitives (`.card-cosmic`, `.input-cosmic`, `.btn-secondary`,
+ * `.btn-ghost` hover, `.input-cosmic::placeholder`, and the `body`/`#root`
+ * background gradient + starfield) read `var(--surface-*)` / `--bg-body-*` /
+ * `--starfield-*` / `--placeholder-color` variables whose values are defined
+ * for dark in `:root` and overridden under the light selector. This keeps dark
+ * mode byte-for-byte identical to the pre-M17 output (the dark var values
+ * equal the previously-hardcoded rgba) while letting light mode flip them.
  *
  * Token reference: see library/design-system.md (the persistent source of
  * truth for the redesign).
@@ -67,8 +80,162 @@
 
   --font-display: 'Space Grotesk', system-ui, sans-serif;
 
-  /* Single dark theme — drop the light/dark duality. */
+  /* ---- Theme-aware surface / background variables (DARK defaults) --------
+   * These back the theme-aware primitives (.card-cosmic, .input-cosmic,
+   * .btn-secondary, .btn-ghost hover, placeholder, body background +
+   * starfield). The dark values below EXACTLY equal the rgba literals that
+   * were hardcoded in the primitives before M17, so dark mode renders
+   * byte-for-byte identically. `:root[data-theme='light']` overrides every
+   * one of these for the cosmic-light palette. */
+
+  /* Card / glassy panel */
+  --surface-card: rgba(10, 10, 26, 0.6);
+  --surface-card-border: rgba(139, 92, 246, 0.22);
+  /* Nebula accent glows layered into `.card-cosmic`'s box-shadow. Dark
+   * values EXACTLY equal the previously-hardcoded rgba (byte-for-byte
+   * unchanged dark mode); the light selector overrides them with the
+   * darkened nebula-indigo so the card glow reads on light surfaces. */
+  --glow-card-inset: rgba(99, 102, 241, 0.05);
+  --glow-card-outer: rgba(99, 102, 241, 0.5);
+
+  /* Input / form field */
+  --surface-input: rgba(4, 4, 12, 0.7);
+  --surface-input-border: rgba(167, 139, 250, 0.3);
+  --placeholder-color: rgba(156, 163, 196, 0.6);
+  /* Nebula accent ring layered into `.input-cosmic:focus`'s box-shadow.
+   * Dark value EXACTLY equals the previously-hardcoded rgba; the light
+   * selector overrides it with the darkened nebula-purple so focus rings
+   * stay on-brand and visible on light surfaces. */
+  --glow-input-focus-ring: rgba(139, 92, 246, 0.25);
+
+  /* Secondary button + its hover */
+  --surface-btn-secondary: rgba(20, 20, 50, 0.6);
+  --surface-btn-secondary-border: rgba(167, 139, 250, 0.4);
+  --surface-btn-secondary-hover: rgba(30, 30, 70, 0.7);
+  --surface-btn-secondary-hover-border: rgba(167, 139, 250, 0.8);
+
+  /* Ghost button hover wash */
+  --surface-btn-ghost-hover: rgba(139, 92, 246, 0.12);
+
+  /* Body background gradient stops (reference the deep-space tokens so the
+   * Tailwind utilities `bg-deep-space-*` and the body gradient share a
+   * single source of truth that flips together in light mode). */
+  --bg-body-color: var(--color-deep-space-base);
+  --bg-body-darker: var(--color-deep-space-darker);
+  --bg-body-base: var(--color-deep-space-base);
+  --bg-body-lighter: var(--color-deep-space-lighter);
+
+  /* Starfield pinpoints (9 static radial-gradient dots). Dark values are the
+   * pre-M17 white-on-deep-space literals. Light values are toned-down soft
+   * lavender/indigo pinpoints for the daytime sky. */
+  --starfield-1: rgba(255, 255, 255, 0.85);
+  --starfield-2: rgba(255, 255, 255, 0.6);
+  --starfield-3: rgba(255, 255, 255, 0.75);
+  --starfield-4: rgba(255, 255, 255, 0.5);
+  --starfield-5: rgba(255, 255, 255, 0.7);
+  --starfield-6: rgba(255, 255, 255, 0.55);
+  --starfield-7: rgba(255, 255, 255, 0.65);
+  --starfield-8: rgba(255, 255, 255, 0.45);
+  --starfield-9: rgba(255, 255, 255, 0.6);
+
+  /* Landing-hero image overlay (M17 light-theme audit). A translucent overlay
+   * layered between the cosmic gradient fallback and the optional
+   * /landing-hero.jpg so the headline stays legible over the image. Dark
+   * values are the pre-M17 hardcoded dark rgba (white headline on a dark
+   * overlay over a dark image); the light selector overrides them with a
+   * light overlay so the dark-ink headline stays legible in cosmic-light.
+   * The dark values EXACTLY equal the previously-hardcoded rgba so dark mode
+   * is byte-for-byte unchanged. */
+  --hero-overlay-top: rgba(4, 4, 12, 0.65);
+  --hero-overlay-mid: rgba(10, 10, 26, 0.55);
+  --hero-overlay-bottom: rgba(4, 4, 12, 0.8);
+
+  /* Dark is the default theme. */
   color-scheme: dark;
+}
+
+/* ---- Cosmic-LIGHT theme overrides ------------------------------------- *
+ * Applied when <html data-theme="light">. Soft daytime / lavender-sky
+ * backgrounds, a toned-down starfield, nebula purple/indigo accents darkened
+ * for AA contrast on light surfaces, dark ink text (flipped
+ * --color-star-white / --color-muted), and `color-scheme: light`. Dark mode
+ * is unaffected (this selector only matches the light attribute). */
+:root[data-theme='light'] {
+  --color-deep-space-darker: #ddd6ec;
+  --color-deep-space-base: #f3f0fb;
+  --color-deep-space-lighter: #e6dff4;
+
+  --color-nebula-purple: #6d28d9;
+  --color-nebula-indigo: #4338ca;
+  --color-nebula-purple-soft: #7c3aed;
+
+  --color-coral: #e85d3a;
+  --color-dune: #b88c5e;
+
+  /* Foreground flipped to dark ink for readable text on light surfaces. */
+  --color-star-white: #1a1a2e;
+  --color-muted: #4a5170;
+
+  /* Semantic — darkened for AA contrast on light surfaces. */
+  --color-cosmic-success: #15803d;
+  --color-cosmic-error: #b91c1c;
+  --color-cosmic-warning: #b45309;
+
+  /* Theme-aware surface vars — light variants. */
+  --surface-card: rgba(255, 255, 255, 0.72);
+  --surface-card-border: rgba(109, 40, 217, 0.25);
+  /* Nebula accent glows for `.card-cosmic` — light variants. The darkened
+   * nebula-indigo (#4338ca -> rgb(67,56,202)) replaces the dark-mode
+   * nebula-indigo so the card glow reads on light surfaces. The inset alpha
+   * is bumped slightly (0.05 -> 0.06) and the outer alpha trimmed (0.5 ->
+   * 0.45) so the glow stays subtle against the light card fill. */
+  --glow-card-inset: rgba(67, 56, 202, 0.06);
+  --glow-card-outer: rgba(67, 56, 202, 0.45);
+
+  --surface-input: rgba(255, 255, 255, 0.85);
+  --surface-input-border: rgba(109, 40, 217, 0.3);
+  --placeholder-color: rgba(74, 81, 112, 0.7);
+  /* Nebula accent ring for `.input-cosmic:focus` — light variant. The
+   * darkened nebula-purple (#6d28d9 -> rgb(109,40,217)) replaces the
+   * dark-mode nebula-purple, with the alpha nudged up (0.25 -> 0.3) so the
+   * focus ring stays visible on the light input fill. */
+  --glow-input-focus-ring: rgba(109, 40, 217, 0.3);
+
+  --surface-btn-secondary: rgba(255, 255, 255, 0.7);
+  --surface-btn-secondary-border: rgba(109, 40, 217, 0.4);
+  --surface-btn-secondary-hover: rgba(244, 241, 251, 0.9);
+  --surface-btn-secondary-hover-border: rgba(109, 40, 217, 0.7);
+
+  --surface-btn-ghost-hover: rgba(109, 40, 217, 0.12);
+
+  /* Body gradient stops — reference the flipped deep-space tokens so the
+   * body gradient and the `bg-deep-space-*` utilities re-theme together. */
+  --bg-body-color: var(--color-deep-space-base);
+  --bg-body-darker: var(--color-deep-space-darker);
+  --bg-body-base: var(--color-deep-space-base);
+  --bg-body-lighter: var(--color-deep-space-lighter);
+
+  /* Toned-down starfield — faint lavender/indigo pinpoints for a daytime sky. */
+  --starfield-1: rgba(109, 40, 217, 0.12);
+  --starfield-2: rgba(99, 102, 241, 0.08);
+  --starfield-3: rgba(109, 40, 217, 0.1);
+  --starfield-4: rgba(99, 102, 241, 0.07);
+  --starfield-5: rgba(109, 40, 217, 0.1);
+  --starfield-6: rgba(99, 102, 241, 0.08);
+  --starfield-7: rgba(109, 40, 217, 0.09);
+  --starfield-8: rgba(99, 102, 241, 0.06);
+  --starfield-9: rgba(109, 40, 217, 0.08);
+
+  /* Landing-hero image overlay — light variants. A light lavender/white
+   * overlay over the optional hero image so the dark-ink headline
+   * (--color-star-white flipped to #1a1a2e) stays readable in cosmic-light,
+   * mirroring how the dark overlay keeps the white headline readable in
+   * dark mode. */
+  --hero-overlay-top: rgba(243, 240, 251, 0.72);
+  --hero-overlay-mid: rgba(243, 240, 251, 0.55);
+  --hero-overlay-bottom: rgba(221, 214, 236, 0.82);
+
+  color-scheme: light;
 }
 
 /* ---- Global cosmic background on body/#root --------------------------- */
@@ -92,24 +259,26 @@ body {
   /* Deep-space vertical gradient (darker at top, lighter mid, darker bottom)
    * layered with a subtle CSS starfield of tiny static pinpoints. The
    * starfield uses multiple radial-gradients at fixed positions so it stays
-   * cheap and never reflows. */
-  background-color: var(--color-deep-space-base);
+   * cheap and never reflows. The gradient stops + starfield colors come from
+   * CSS variables that flip in cosmic-light mode (see :root and
+   * :root[data-theme='light'] above). */
+  background-color: var(--bg-body-color);
   background-image:
-    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.85) 50%, transparent 51%),
-    radial-gradient(1px 1px at 28% 72%, rgba(255, 255, 255, 0.6) 50%, transparent 51%),
-    radial-gradient(1px 1px at 47% 33%, rgba(255, 255, 255, 0.75) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 63% 58%, rgba(255, 255, 255, 0.5) 50%, transparent 51%),
-    radial-gradient(1px 1px at 78% 22%, rgba(255, 255, 255, 0.7) 50%, transparent 51%),
-    radial-gradient(1px 1px at 88% 80%, rgba(255, 255, 255, 0.55) 50%, transparent 51%),
-    radial-gradient(1px 1px at 35% 88%, rgba(255, 255, 255, 0.65) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 55% 12%, rgba(255, 255, 255, 0.45) 50%, transparent 51%),
-    radial-gradient(1px 1px at 70% 45%, rgba(255, 255, 255, 0.6) 50%, transparent 51%),
+    radial-gradient(1px 1px at 12% 18%, var(--starfield-1) 50%, transparent 51%),
+    radial-gradient(1px 1px at 28% 72%, var(--starfield-2) 50%, transparent 51%),
+    radial-gradient(1px 1px at 47% 33%, var(--starfield-3) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 63% 58%, var(--starfield-4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 22%, var(--starfield-5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 80%, var(--starfield-6) 50%, transparent 51%),
+    radial-gradient(1px 1px at 35% 88%, var(--starfield-7) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 55% 12%, var(--starfield-8) 50%, transparent 51%),
+    radial-gradient(1px 1px at 70% 45%, var(--starfield-9) 50%, transparent 51%),
     radial-gradient(
       180deg,
-      var(--color-deep-space-darker) 0%,
-      var(--color-deep-space-base) 35%,
-      var(--color-deep-space-lighter) 60%,
-      var(--color-deep-space-base) 100%
+      var(--bg-body-darker) 0%,
+      var(--bg-body-base) 35%,
+      var(--bg-body-lighter) 60%,
+      var(--bg-body-base) 100%
     );
   background-attachment: fixed;
   background-repeat: no-repeat;
@@ -135,7 +304,11 @@ h3 {
 /* ---- Shared cosmic UI primitives (@layer components) ------------------ */
 /* Small, reusable utility classes used across the redesign. They live in
  * `@layer components` so Tailwind utilities can still override them when a
- * page needs a one-off tweak. See library/design-system.md for usage. */
+ * page needs a one-off tweak. See library/design-system.md for usage.
+ *
+ * Theme-aware primitives read the `--surface-*` / `--placeholder-color` vars
+ * (defined in :root for dark and overridden in :root[data-theme='light']) so
+ * they flip correctly in both themes. */
 
 @layer components {
   /* Button — primary (nebula accent) */
@@ -175,15 +348,15 @@ h3 {
     outline-offset: 2px;
   }
 
-  /* Button — secondary (subtle bordered) */
+  /* Button — secondary (subtle bordered) — theme-aware fill + border */
   .btn-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     border-radius: 0.5rem;
-    border: 1px solid rgba(167, 139, 250, 0.4);
-    background-color: rgba(20, 20, 50, 0.6);
+    border: 1px solid var(--surface-btn-secondary-border);
+    background-color: var(--surface-btn-secondary);
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 600;
@@ -191,8 +364,8 @@ h3 {
     transition: border-color 0.15s ease, background-color 0.15s ease;
   }
   .btn-secondary:hover {
-    border-color: rgba(167, 139, 250, 0.8);
-    background-color: rgba(30, 30, 70, 0.7);
+    border-color: var(--surface-btn-secondary-hover-border);
+    background-color: var(--surface-btn-secondary-hover);
   }
   .btn-secondary:disabled {
     cursor: not-allowed;
@@ -203,7 +376,7 @@ h3 {
     outline-offset: 2px;
   }
 
-  /* Button — ghost (no border, subtle hover) */
+  /* Button — ghost (no border, subtle hover) — theme-aware hover wash */
   .btn-ghost {
     display: inline-flex;
     align-items: center;
@@ -220,7 +393,7 @@ h3 {
   }
   .btn-ghost:hover {
     color: var(--color-star-white);
-    background-color: rgba(139, 92, 246, 0.12);
+    background-color: var(--surface-btn-ghost-hover);
   }
   .btn-ghost:disabled {
     cursor: not-allowed;
@@ -231,35 +404,38 @@ h3 {
     outline-offset: 2px;
   }
 
-  /* Card / Panel — glassy, subtle border + nebula glow */
+  /* Card / Panel — glassy, subtle border + nebula glow — theme-aware.
+   * The glow rgba values come from `--glow-card-inset` / `--glow-card-outer`
+   * (dark defaults in :root, light overrides in :root[data-theme='light'])
+   * so the card glow reads on both dark and light surfaces. */
   .card-cosmic {
     border-radius: 0.75rem;
-    border: 1px solid rgba(139, 92, 246, 0.22);
-    background-color: rgba(10, 10, 26, 0.6);
+    border: 1px solid var(--surface-card-border);
+    background-color: var(--surface-card);
     backdrop-filter: blur(10px);
     box-shadow:
-      0 0 0 1px rgba(99, 102, 241, 0.05) inset,
-      0 18px 40px -24px rgba(99, 102, 241, 0.5);
+      0 0 0 1px var(--glow-card-inset) inset,
+      0 18px 40px -24px var(--glow-card-outer);
   }
 
-  /* Input / form field */
+  /* Input / form field — theme-aware fill + border + placeholder */
   .input-cosmic {
     display: block;
     width: 100%;
     border-radius: 0.5rem;
-    border: 1px solid rgba(167, 139, 250, 0.3);
-    background-color: rgba(4, 4, 12, 0.7);
+    border: 1px solid var(--surface-input-border);
+    background-color: var(--surface-input);
     padding: 0.5rem 0.75rem;
     color: var(--color-star-white);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .input-cosmic::placeholder {
-    color: rgba(156, 163, 196, 0.6);
+    color: var(--placeholder-color);
   }
   .input-cosmic:focus {
     border-color: var(--color-nebula-purple);
     outline: none;
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+    box-shadow: 0 0 0 3px var(--glow-input-focus-ring);
   }
   .input-cosmic[aria-invalid='true'] {
     border-color: var(--color-cosmic-error);

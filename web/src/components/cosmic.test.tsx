@@ -99,4 +99,25 @@ describe('AppLayout cosmic foundation', () => {
     // The header must also be a positioned element for z-index to take effect.
     expect(header!.className).toMatch(/\b(relative|sticky|absolute|fixed)\b/);
   });
+
+  // M17 / VAL-THEME-010: a theme toggle is present in the authenticated
+  // AppLayout header, alongside the UserMenu and nav links. Asserts presence
+  // only — the toggle's flip behavior is covered in ThemeToggle.test.tsx.
+  it('renders a theme-toggle in the header (VAL-THEME-010)', () => {
+    renderWithProviders(
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Child />} />
+        </Route>
+      </Routes>,
+      { routerProps: { initialEntries: ['/'], initialIndex: 0 } },
+    );
+
+    const toggle = screen.getByTestId('theme-toggle');
+    expect(toggle).toBeInTheDocument();
+    // The toggle lives inside the header element.
+    expect(toggle.closest('header')).not.toBeNull();
+    // Accessible name reflects an action (switch to <mode> mode).
+    expect(toggle.getAttribute('aria-label')).toMatch(/switch to (light|dark) mode/i);
+  });
 });

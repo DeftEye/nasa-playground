@@ -228,3 +228,21 @@ describe('Register — M5 polish: register succeeds but login fails', () => {
     expect(screen.queryByText('Home page')).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Public theme toggle (M17 / VAL-THEME-011)
+// ---------------------------------------------------------------------------
+
+describe('Register public theme toggle (VAL-THEME-011)', () => {
+  it('renders a theme-toggle on the Register page', () => {
+    renderWithProviders(<RegisterTree />, {
+      routerProps: { initialEntries: ['/register'] },
+    });
+
+    const toggle = screen.getByTestId('theme-toggle');
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.getAttribute('aria-label')).toMatch(
+      /switch to (light|dark) mode/i,
+    );
+  });
+});
